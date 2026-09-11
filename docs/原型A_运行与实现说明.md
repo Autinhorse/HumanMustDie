@@ -48,7 +48,7 @@
 - **入口推导**按确认的规则：地图边缘上离核心最远的那个连通开口（地面或桥面）整段作为出生点，敌人成堆涌入。
 - **墙面放置规则**按确认的规则：墙格的四个侧面中，只有正对另一面墙的那一面不可用，其余暴露面（含朝向障碍、朝向空地的面）都能放机关。
 - **5 种机关**：地刺、黏胶地面、弹射板、推墙、旋转锯墙。
-- **3 类敌人**：小兵（小型）、狂战士（中型）、巨魔（重型）。
+- **4 类敌人**：小兵（小型）、狂战士（中型）、盾兵（中型、体型更大）、巨魔（重型）。
 - **物理**：质量 / 稳定值 / 冲击积累三属性，击飞、滑行、撞墙反弹、落地伤害、坠落处决、被击飞单位撞伤沿途敌人。
 - **5 波手工波次**、金币、核心生命、胜负与重开流程。
 - **可复现性**：固定步长（1/60）+ 固定种子，战斗日志可导出到 `%APPDATA%\Godot\app_userdata\...\logs\`。
@@ -228,8 +228,14 @@ python tools/map_from_image.py --image ref/DungeonWarfareMap01.png     --out dat
 
 ## 6.7 敌人模型与程序化动作（v0.0.9 起）
 
-参考 `ref/swordman.png`，`tools/blender/build_swordman.py` 在 Blender 里用盒子搭出剑士
-并导出 `assets/models/swordman.glb`。**不做骨骼**：每个部件的原点放在关节上
+参考 `ref/swordman.png`，`tools/blender/build_swordman.py` 在 Blender 里用盒子搭出角色
+并导出 glb。两种敌人共用同一套骨架：
+
+- `--variant swordman` → `assets/models/swordman.glb`
+- `--variant shieldman` → `assets/models/shieldman.glb`，左臂抬起来托一面椭圆盾
+  （金色边框 + 贯穿上下左右的金色十字），右手照旧持剑
+
+`toolsebuild_models.bat` 会把两个都生成。**不做骨骼**：每个部件的原点放在关节上
 （颈 / 肩 / 髋 / 握把），Godot 里直接给节点转角度就能做动作。
 
 ```
@@ -251,6 +257,9 @@ Root
   手臂的摆幅比例）、`torso_lean_deg` / `head_lean_deg`（前倾）、`bob_height`
   （上下起伏）、**`stride_ratio`**（步幅占身高的比例 —— 相位由距离驱动，所以
   这个值越大，步子越大、一个跑步循环耗时越长）。
+- `anim.per_model.<模型名>` 可以**按模型覆盖**上面任意一项，另外支持 `lock_arms`
+  列出哪些手臂保持模型自带的静止姿势不参与摆动。盾兵就是靠这个做的：上身前倾
+  只有剑士的一半（7° / 2°），左臂锁住托盾，只有持剑的右臂摆动，腿和剑士一样。
 - **被击飞**时缩成一团，比僵直地保持跑步姿势可读。
 - **倒地**：先把剑从手上解绑扔出去（自带抛物线和旋转，落地停住），
   身体绕脚跟仰面转 90°，四肢摊平。
@@ -304,8 +313,9 @@ Blender / Godot 装在别处的话，设环境变量 `BLENDER_EXE` / `GODOT_EXE`
 
 ```
 Godot_v4.7-stable_win64.exe --path . res://tests/pose.tscn -- --shot D:/poses.png
-                                          -- --yaw 90     侧视，判断前倾和剑的倾角必须用它
-                                          -- --facings    八个朝向排开，检查道具在各朝向是否一致
+      --model shieldman   换模型看（默认 swordman）
+      --yaw 90            侧视，判断前倾和剑的倾角必须用它
+      --facings           八个朝向排开，检查道具在各朝向是否一致
 ```
 
 ## 7. 已知问题 / 下一步

@@ -59,7 +59,16 @@
     "torso_lean_deg": 14.0,
     "head_lean_deg": 4.0,
     "bob_height": 0.06,
-    "stride_ratio": 0.715
+    "stride_ratio": 0.715,
+
+    "per_model": {
+      "_comment": "按模型覆盖上面的动作参数。lock_arms 里的手臂保持模型自带的静止姿势，不参与摆动。",
+      "shieldman": {
+        "torso_lean_deg": 7.0,
+        "head_lean_deg": 2.0,
+        "lock_arms": ["ArmL"]
+      }
+    }
   },
 
   "environment": {

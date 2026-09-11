@@ -33,6 +33,22 @@
     "color": [0.941, 0.569, 0.235]
   },
 
+  "shieldman": {
+    "name": "盾兵",
+    "class": "中型",
+    "hp": 260,
+    "speed": 2.4,
+    "mass": 6.0,
+    "stability": 30.0,
+    "impact_decay": 1.0,
+    "gold": 18,
+    "core_damage": 3,
+    "model": "shieldman",
+    "radius": 0.62,
+    "height": 1.7,
+    "color": [0.396, 0.478, 0.710]
+  },
+
   "troll": {
     "name": "巨魔",
     "class": "重型",

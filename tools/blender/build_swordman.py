@@ -1,5 +1,6 @@
 """
-剑士模型：参考 ref/swordman.png，全部用盒子搭，不做骨骼。
+剑士 / 盾兵模型：参考 ref/swordman.png，全部用盒子搭，不做骨骼。
+两种敌人共用同一套骨架，`--variant shieldman` 会在左臂上加一面盾并把左臂抬起来。
 
 关键点是**每个部件的原点放在关节上**（颈、肩、髋、握把），这样导进 Godot 之后
 直接给节点转角度就能做跑步和倒地动画，不需要骨骼和动画数据。
@@ -43,6 +44,13 @@ P = {
     "shoulder_drop": 0.03,
     "blade_len": 0.42, "blade_w": 0.075, "blade_d": 0.028, "tip_len": 0.10,
     "guard_w": 0.20, "guard_h": 0.035, "grip_len": 0.09,
+    # 盾兵
+    "shield_arm_lift": 52.0,   # 左臂前抬角度
+    "shield_fwd": 0.17,        # 盾往前推出多少
+    "shield_side": 0.03,       # 盾再往左手那侧挪一点
+    "shield_rx": 0.180, "shield_rz": 0.265, "shield_thick": 0.05,
+    "shield_rim": 0.030,       # 边框比盘面大多少
+    "shield_bar": 0.055,       # 十字条宽度
 }
 
 COLORS = {
@@ -112,6 +120,39 @@ def box(name, center, size, material, parent, top_scale=1.0, bevel=0.012,
     return ob
 
 
+def ellipse(name, center, rx, rz, thickness, material, parent, bevel=0.008):
+    """椭圆盘：在 XZ 平面画 n 边形，沿 Y（角色前方）挤出。用来做盾牌。"""
+    cx, cy, cz = center
+    sides = 22
+    hy = thickness / 2.0
+    verts, faces = [], []
+    for i in range(sides):
+        a = 2 * math.pi * i / sides
+        verts.append((cx + math.cos(a) * rx, cy - hy, cz + math.sin(a) * rz))
+    for i in range(sides):
+        a = 2 * math.pi * i / sides
+        verts.append((cx + math.cos(a) * rx, cy + hy, cz + math.sin(a) * rz))
+    for i in range(sides):
+        j = (i + 1) % sides
+        faces.append((i, j, j + sides, i + sides))
+    faces.append(tuple(range(sides - 1, -1, -1)))
+    faces.append(tuple(range(sides, sides * 2)))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    me.materials.append(mat(material))
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    if bevel > 0:
+        b = ob.modifiers.new("Bevel", "BEVEL")
+        b.width = bevel
+        b.segments = 2
+        b.limit_method = "ANGLE"
+        b.angle_limit = math.radians(35)
+    ob.parent = parent
+    return ob
+
+
 def joint(name, local_pos, parent=None, rotation=None):
     """关节 = 一个空物体，位置用**相对父节点**的局部坐标，旋转轴就在它身上"""
     e = bpy.data.objects.new(name, None)
@@ -127,7 +168,7 @@ def joint(name, local_pos, parent=None, rotation=None):
 
 # ----------------------------------------------------------------- 建模
 
-def build():
+def build(variant="swordman"):
     clear()
     leg_top = P["leg_h"]
     torso_h = P["torso_h"]
@@ -163,13 +204,19 @@ def build():
     shoulder_z = torso_h - P["shoulder_drop"]
     arm_x = P["torso_w"] * 1.04 / 2 + P["arm_w"] / 2 + 0.008
     for side, sx in (("L", -1.0), ("R", 1.0)):
-        arm = joint("Arm%s" % side, (sx * arm_x, 0, shoulder_z), torso)
+        # 盾兵的左臂抬起来横在身前托盾，所以关节自带一个前抬角
+        rot = None
+        if variant == "shieldman" and side == "L":
+            rot = (math.radians(P["shield_arm_lift"]), 0, 0)
+        arm = joint("Arm%s" % side, (sx * arm_x, 0, shoulder_z), torso, rotation=rot)
         box("Upper%s" % side, (0, 0, -P["upper_arm"] / 2),
             (P["arm_w"], P["arm_d"], P["upper_arm"]), "cloth_red", arm)
         box("Fore%s" % side, (0, 0, -P["upper_arm"] - P["fore_arm"] / 2),
             (P["arm_w"] * 1.03, P["arm_d"] * 1.03, P["fore_arm"]), "armor_dark", arm)
         if side == "R":
             build_sword(arm, -P["upper_arm"] - P["fore_arm"])
+        elif variant == "shieldman":
+            build_shield(arm, -P["upper_arm"] - P["fore_arm"] * 0.5)
 
     # --- 腿：原点在髋
     leg_x = P["leg_w"] / 2 + P["leg_gap"] / 2
@@ -182,6 +229,27 @@ def build():
             "metal_gold", leg, top_scale=0.92)
 
     return root
+
+
+def build_shield(arm, hand_z):
+    """盾：椭圆板 + 一圈异色边 + 贯穿上下左右的十字。挂在左臂上，盘面朝角色前方 +Y。"""
+    # 左臂抬起来了，这里把盾转回来让盘面竖直朝前
+    shield = joint("Shield", (-P["shield_side"], P["shield_fwd"], hand_z),
+                   arm, rotation=(math.radians(-P["shield_arm_lift"]), 0, 0))
+    rx, rz = P["shield_rx"], P["shield_rz"]
+    t = P["shield_thick"]
+    # 边框：比盘面大一圈、往后错一点，露出来就是一圈边
+    ellipse("ShieldRim", (0, 0, 0), rx + P["shield_rim"], rz + P["shield_rim"], t, "metal_gold", shield)
+    ellipse("ShieldFace", (0, t * 0.45, 0), rx, rz, t, "armor_primary", shield)
+    # 十字：横竖两条贯穿到边框
+    bar = P["shield_bar"]
+    # 十字刚好顶到边框内沿，别戳出去
+    # 十字用金色：盾面是会按敌人换色的主色，暗色十字在深色敌人身上会糊掉
+    box("ShieldBarV", (0, t * 0.75, 0), (bar, t * 0.7, (rz + P["shield_rim"] * 0.5) * 2.0),
+        "metal_gold", shield, bevel=0.004)
+    box("ShieldBarH", (0, t * 0.75, 0), ((rx + P["shield_rim"] * 0.5) * 2.0, t * 0.7, bar),
+        "metal_gold", shield, bevel=0.004)
+    return shield
 
 
 def build_sword(arm, hand_z):
@@ -266,6 +334,7 @@ def main():
     argv = argv[argv.index("--") + 1:] if "--" in argv else []
     out = "assets/models/swordman.glb"
     preview = ""
+    variant = "swordman"
     i = 0
     while i < len(argv):
         if argv[i] == "--out" and i + 1 < len(argv):
@@ -274,9 +343,12 @@ def main():
         elif argv[i] == "--render" and i + 1 < len(argv):
             preview = argv[i + 1]
             i += 2
+        elif argv[i] == "--variant" and i + 1 < len(argv):
+            variant = argv[i + 1]
+            i += 2
         else:
             i += 1
-    build()
+    build(variant)
     if preview:
         render_preview(preview)
     export_glb(out)

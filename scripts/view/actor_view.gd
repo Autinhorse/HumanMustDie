@@ -4,13 +4,14 @@ extends Node3D
 ## （颈/肩/髋/握把），这里直接给节点转角度做跑步和倒地。
 
 const MODEL_DIR := "res://assets/models/"
-const PART_NAMES := ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR", "Sword"]
+const PART_NAMES := ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR", "Sword", "Shield"]
 
 static var _scene_cache: Dictionary = {}
 
 var parts: Dictionary = {}          # 名字 -> Node3D
 var rest: Dictionary = {}           # 名字 -> 静止姿势的 transform
 var model_root: Node3D = null
+var model_id := ""
 var ok := false
 
 var _tint_mats: Array[StandardMaterial3D] = []
@@ -21,13 +22,15 @@ var _sword_arm_ratio := 0.55
 var _torso_lean := 14.0
 var _head_lean := 4.0
 var _bob := 0.06
+var _locked_arms: Array = []
 var _sword_free := false
 var _sword_vel := Vector3.ZERO
 var _sword_spin := Vector3.ZERO
 
 # ---------------------------------------------------------------- 载入
 
-func setup(model_id: String, height: float, color: Color) -> bool:
+func setup(p_model_id: String, height: float, color: Color) -> bool:
+	model_id = p_model_id
 	var path := MODEL_DIR + model_id + ".glb"
 	if not _scene_cache.has(path):
 		_scene_cache[path] = load(path) if ResourceLoader.exists(path) else null
@@ -51,7 +54,12 @@ func setup(model_id: String, height: float, color: Color) -> bool:
 
 ## 动作参数放在 data/art.json 的 anim 段，改完 F5 就能试
 func _load_anim_params() -> void:
-	var a: Dictionary = Cfg.art.get("anim", {})
+	var a: Dictionary = Cfg.art.get("anim", {}).duplicate()
+	# 按模型覆盖：盾兵上身更直、左臂托盾不摆
+	var per: Dictionary = Cfg.art.get("anim", {}).get("per_model", {}).get(model_id, {})
+	for k in per.keys():
+		a[k] = per[k]
+	_locked_arms = a.get("lock_arms", [])
 	_leg_swing = float(a.get("leg_swing_deg", _leg_swing))
 	_arm_swing = float(a.get("arm_swing_deg", _arm_swing))
 	_sword_arm_ratio = float(a.get("sword_arm_ratio", _sword_arm_ratio))
@@ -121,9 +129,11 @@ func set_run(phase: float, intensity: float) -> void:
 	var s := sin(phase)
 	_rot("LegL", Vector3(s * sw, 0, 0))
 	_rot("LegR", Vector3(-s * sw, 0, 0))
-	_rot("ArmL", Vector3(-s * aw, 0, deg_to_rad(6.0)))
+	if not _locked_arms.has("ArmL"):
+		_rot("ArmL", Vector3(-s * aw, 0, deg_to_rad(6.0)))
 	# 持剑那条手臂摆幅小一些，剑跟着甩太厉害会看不清朝向
-	_rot("ArmR", Vector3(s * aw * _sword_arm_ratio, 0, -deg_to_rad(6.0)))
+	if not _locked_arms.has("ArmR"):
+		_rot("ArmR", Vector3(s * aw * _sword_arm_ratio, 0, -deg_to_rad(6.0)))
 	# 剑反向抵消手臂的摆动：等距相机下剑一旦偏离竖直就会被压扁成横的，
 	# 不同朝向看起来就像"剑一会朝上一会朝下"
 	if not _sword_free:
@@ -156,7 +166,8 @@ func set_tumble(t: float) -> void:
 	var a := deg_to_rad(45.0)
 	_rot("LegL", Vector3(-a, 0, deg_to_rad(10)))
 	_rot("LegR", Vector3(-a * 0.7, 0, -deg_to_rad(10)))
-	_rot("ArmL", Vector3(-a * 1.4, 0, deg_to_rad(25)))
+	if not _locked_arms.has("ArmL"):
+		_rot("ArmL", Vector3(-a * 1.4, 0, deg_to_rad(25)))
 	_rot("ArmR", Vector3(-a * 1.2, 0, -deg_to_rad(25)))
 	_rot("Torso", Vector3(deg_to_rad(20), 0, 0))
 	if model_root != null:

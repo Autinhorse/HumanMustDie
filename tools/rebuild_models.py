@@ -22,6 +22,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# (build_swordman.py 的 --variant, 输出文件名)
+MODELS = [("swordman", "swordman"), ("shieldman", "shieldman")]
+
 BLENDER_CANDIDATES = [
     os.environ.get("BLENDER_EXE", ""),
     r"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe",
@@ -70,18 +73,20 @@ def main():
     blender = find(BLENDER_CANDIDATES, "Blender", "BLENDER_EXE")
     godot = find(GODOT_CANDIDATES, "Godot", "GODOT_EXE")
 
-    run([blender, "--background", "--python", os.path.join("tools", "blender", "build_swordman.py"),
-         "--", "--out", os.path.join("assets", "models", "swordman.glb"),
-         "--render", os.path.join("renders", "swordman.png")],
-        "[1/2] Blender 导出模型 ...")
+    for i, (variant, name) in enumerate(MODELS):
+        run([blender, "--background", "--python", os.path.join("tools", "blender", "build_swordman.py"),
+             "--", "--variant", variant,
+             "--out", os.path.join("assets", "models", name + ".glb"),
+             "--render", os.path.join("renders", name + ".png")],
+            "[%d/%d] Blender 导出 %s ..." % (i + 1, len(MODELS) + 1, name))
 
     # 这步不能省：非编辑器模式不会重新导入 glb，游戏里会一直用旧模型
     run([godot, "--headless", "--editor", "--quit", "--path", "."],
-        "[2/2] Godot 重新导入资源 ...")
+        "[%d/%d] Godot 重新导入资源 ..." % (len(MODELS) + 1, len(MODELS) + 1))
 
     print("\n完成：")
-    print("  模型   assets/models/swordman.glb")
-    print("  预览图 renders/swordman.png")
+    for _, name in MODELS:
+        print("  模型 assets/models/%s.glb   预览图 renders/%s.png" % (name, name))
 
     if pose:
         shot = os.path.join(ROOT, "renders", "poses.png")

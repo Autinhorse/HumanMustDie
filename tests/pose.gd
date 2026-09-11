@@ -27,7 +27,7 @@ func _build_facings() -> void:
 		for k in 8:
 			var a := ActorView.new()
 			add_child(a)
-			a.setup("swordman", 1.0, Color(0.886, 0.290, 0.482))
+			a.setup(_model_id(), 1.0, _model_color())
 			a.position = Vector3((k - 3.5) * 1.5, 0, (i - 0.5) * 2.2)
 			a.rotation_degrees.y = k * 45.0
 			a.set_run(phase, 1.0)
@@ -79,6 +79,23 @@ func _extra_yaw() -> float:
 			return float(args[i + 1])
 	return 0.0
 
+## --model shieldman 可以看盾兵
+func _model_id() -> String:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--model" and i + 1 < args.size():
+			return String(args[i + 1])
+	return "swordman"
+
+func _model_color() -> Color:
+	for id in Cfg.enemies.keys():
+		if typeof(Cfg.enemies[id]) != TYPE_DICTIONARY:
+			continue        # enemies.json 里有 _comment 这种字符串字段
+		var e: Dictionary = Cfg.enemies[id]
+		if String(e.get("model", "")) == _model_id():
+			return Cfg.to_color(e.get("color"), Color(0.886, 0.290, 0.482))
+	return Color(0.886, 0.290, 0.482)
+
 func _build_poses() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -101,7 +118,7 @@ func _build_poses() -> void:
 		var p: Dictionary = POSES[i]
 		var a := ActorView.new()
 		add_child(a)
-		if not a.setup("swordman", 1.0, Color(0.886, 0.290, 0.482)):
+		if not a.setup(_model_id(), 1.0, _model_color()):
 			push_error("模型载入失败")
 			get_tree().quit(1)
 			return
