@@ -6,7 +6,7 @@
     "mount": "ground",
     "cost": 60,
     "directional": false,
-    "color": [0.72, 0.70, 0.64],
+    "color": [0.549, 0.576, 0.627],
     "desc": "周期群体伤害（验证基础伤害与冷却）",
     "targeting": { "type": "self_cell" },
     "trigger": { "type": "periodic", "cooldown": 1.6, "require_enemy": true },

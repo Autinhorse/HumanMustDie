@@ -12,6 +12,7 @@ var _yaw := 0.0
 var _dist := 60.0
 var _pitch := -52.0
 var _ortho_size := 46.0
+var _backdrop: MeshInstance3D = null
 
 var pending_trap_id: String = ""
 var pending_facing := Vector2i(0, -1)
@@ -55,27 +56,112 @@ func _refresh_board() -> void:
 	hud.refresh()
 
 func _build_world() -> void:
+	var env_cfg: Dictionary = Cfg.art.get("environment", {})
+
 	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.07, 0.08, 0.10)
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.55, 0.58, 0.68)
-	e.ambient_light_energy = 0.55
-	env.environment = e
+	env.environment = _make_environment(env_cfg)
 	add_child(env)
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-58, -35, 0)
-	sun.light_energy = 1.1
+	sun.name = "Sun"
+	var elev := deg_to_rad(_ec(env_cfg, "sun_elevation_deg", 42.0))
+	var azim := deg_to_rad(_ec(env_cfg, "sun_azimuth_deg", 35.0))
+	sun.rotation = Vector3(-elev, azim, 0.0)
+	sun.light_color = _hex(env_cfg, "sun_color", Color(1.0, 0.96, 0.91))
+	sun.light_energy = _ec(env_cfg, "sun_energy", 1.9)
+	sun.light_angular_distance = _ec(env_cfg, "sun_angular_distance_deg", 3.5)
 	sun.shadow_enabled = true
+	sun.shadow_blur = _ec(env_cfg, "shadow_blur", 1.4)
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.directional_shadow_max_distance = 200.0
 	add_child(sun)
+
+	# 补光：把阴影面提亮成天空色，避免暗部发死
+	var fill := DirectionalLight3D.new()
+	fill.name = "Fill"
+	fill.rotation = Vector3(deg_to_rad(-28.0), azim + PI * 0.85, 0.0)
+	fill.light_color = _hex(env_cfg, "fill_color", Color(0.75, 0.84, 0.84))
+	fill.light_energy = _ec(env_cfg, "fill_energy", 0.45)
+	fill.shadow_enabled = false
+	add_child(fill)
 
 	_pivot = Node3D.new()
 	add_child(_pivot)
 	cam = Camera3D.new()
 	_pivot.add_child(cam)
+	_build_backdrop(env_cfg)
 	_update_camera()
+
+## 渐变背板：挂在相机上，永远铺满画面。正交投影下程序天空会算出条带，所以自己画。
+func _build_backdrop(env_cfg: Dictionary) -> void:
+	var grad := Gradient.new()
+	grad.set_color(0, _hex(env_cfg, "sky_top", Color(0.42, 0.55, 0.57)))
+	grad.set_color(1, _hex(env_cfg, "sky_horizon", Color(0.65, 0.76, 0.75)))
+	grad.add_point(0.62, _hex(env_cfg, "ground_horizon", Color(0.56, 0.66, 0.66)))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 8
+	tex.height = 512
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(0, 1)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+
+	_backdrop = MeshInstance3D.new()
+	_backdrop.name = "Backdrop"
+	_backdrop.mesh = QuadMesh.new()
+	_backdrop.material_override = mat
+	_backdrop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cam.add_child(_backdrop)
+
+func _make_environment(env_cfg: Dictionary) -> Environment:
+	var e := Environment.new()
+
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = _hex(env_cfg, "sky_horizon", Color(0.65, 0.76, 0.75))
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = _hex(env_cfg, "ambient_color", _hex(env_cfg, "sky_horizon", Color(0.65, 0.76, 0.75)))
+	e.ambient_light_energy = _ec(env_cfg, "ambient_energy", 0.85)
+
+	match String(env_cfg.get("tonemap", "filmic")):
+		"linear":
+			e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+		"aces":
+			e.tonemap_mode = Environment.TONE_MAPPER_ACES
+		"agx":
+			e.tonemap_mode = Environment.TONE_MAPPER_AGX
+		_:
+			e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_exposure = _ec(env_cfg, "exposure", 1.0)
+	e.tonemap_white = _ec(env_cfg, "white", 1.1)
+
+	if bool(env_cfg.get("fog_enabled", true)):
+		e.fog_enabled = true
+		e.fog_light_color = _hex(env_cfg, "fog_color", Color(0.83, 0.89, 0.87))
+		e.fog_density = _ec(env_cfg, "fog_density", 0.006)
+		e.fog_sky_affect = _ec(env_cfg, "fog_sky_affect", 0.0)
+		e.fog_aerial_perspective = _ec(env_cfg, "fog_aerial_perspective", 0.35)
+
+	if bool(env_cfg.get("ssao_enabled", true)):
+		e.ssao_enabled = true
+		e.ssao_radius = _ec(env_cfg, "ssao_radius", 1.4)
+		e.ssao_intensity = _ec(env_cfg, "ssao_intensity", 1.6)
+		e.ssao_power = _ec(env_cfg, "ssao_power", 1.5)
+	return e
+
+func _ec(d: Dictionary, key: String, def: float) -> float:
+	if d.has(key):
+		return float(d[key])
+	return def
+
+func _hex(d: Dictionary, key: String, def: Color) -> Color:
+	if d.has(key) and typeof(d[key]) == TYPE_STRING:
+		return Color(String(d[key]))
+	return def
 
 func _update_camera() -> void:
 	_pivot.rotation_degrees.y = _yaw
@@ -89,6 +175,11 @@ func _update_camera() -> void:
 		cam.size = _ortho_size
 	cam.near = 0.1
 	cam.far = _dist * 4.0
+	if _backdrop != null:
+		var vp := get_viewport().get_visible_rect().size
+		var aspect: float = vp.x / max(vp.y, 1.0)
+		_backdrop.mesh.size = Vector2(_ortho_size * aspect * 1.05, _ortho_size * 1.05)
+		_backdrop.position = Vector3(0, 0, -cam.far * 0.9)
 
 # ---------------------------------------------------------------- 每帧
 
@@ -238,6 +329,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			on_restart()
 		KEY_F5:
 			on_reload_config()
+		KEY_F12:
+			_save_screenshot()
 		KEY_X:
 			if selected_trap != null and is_instance_valid(selected_trap):
 				game.sell(selected_trap)
@@ -346,6 +439,16 @@ func on_reload_config() -> void:
 	_cancel()
 	game.reset()
 	_refresh_board()
+
+func _save_screenshot() -> void:
+	await RenderingServer.frame_post_draw
+	DirAccess.make_dir_recursive_absolute("user://shots")
+	var path := "user://shots/shot_%s.png" % Time.get_datetime_string_from_system().replace(":", "-")
+	var img := get_viewport().get_texture().get_image()
+	if img.save_png(path) == OK:
+		hud.set_inspect("截图已保存：" + ProjectSettings.globalize_path(path))
+	else:
+		hud.set_inspect("截图保存失败")
 
 func on_export_log() -> void:
 	var path := game.export_log()

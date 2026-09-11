@@ -6,7 +6,8 @@
   blender --background --python tools/blender/build_island.py -- \
       --project . --level corridor_01 --out renders/island.png
 
-设计要点都从 data/*.json 读，和游戏保持同一份数据；只有"美术参数"在本文件的 STYLE 里。
+关卡、配色、岩体参数都从 data/*.json 读，和游戏共用同一份数据；
+只有渲染本身的参数（太阳强度、曝光、雾距离）在本文件的 STYLE 里。
 """
 
 import bpy
@@ -294,8 +295,37 @@ def pawn(name, center, radius, height, material):
 
 # ----------------------------------------------------------------- 搭场景
 
+def sync_style_with_game(project):
+    """配色和岩体参数以 data/art.json 为准，避免游戏和渲染两边各写一份"""
+    path = os.path.join(project, "data", "art.json")
+    if not os.path.exists(path):
+        print("ART_JSON_MISSING %s（用脚本内置配色）" % path)
+        return
+    with open(path, encoding="utf-8") as f:
+        art = json.load(f)
+    pal = art.get("palette", {})
+    tops = pal.get("floor_top", [])
+    for i, key in enumerate(("floor_top", "floor_top_b", "floor_top_c")):
+        if i < len(tops):
+            STYLE[key] = tops[i]
+    for src, dst in (("floor_side", "floor_side"), ("bridge_top", "bridge"),
+                     ("wall_top", "wall"), ("wall_side", "wall_dark"),
+                     ("rock_top", "rock"), ("rock_deep", "rock_deep"),
+                     ("obstacle_top", "obstacle"), ("core_rim", "core_rim"),
+                     ("core_water", "core_water"), ("cloud", "cloud")):
+        if src in pal:
+            STYLE[dst] = pal[src]
+    rock = art.get("rock", {})
+    for src, dst in (("edge_depth_min", "rock_depth_min"), ("edge_depth_max", "rock_depth_max"),
+                     ("taper", "rock_taper"), ("jitter", "rock_jitter"), ("seed", "seed")):
+        if src in rock:
+            STYLE[dst] = rock[src]
+    print("STYLE_SYNCED_FROM data/art.json")
+
+
 def build(args):
     project = os.path.abspath(args["project"])
+    sync_style_with_game(project)
     with open(os.path.join(project, "data", "config.json"), encoding="utf-8") as f:
         cfg = json.load(f)
     with open(os.path.join(project, "data", "levels", "%s.json" % args["level"]), encoding="utf-8") as f:

@@ -13,7 +13,7 @@
     "core_damage": 1,
     "radius": 0.42,
     "height": 1.1,
-    "color": [0.82, 0.82, 0.88]
+    "color": [0.886, 0.290, 0.482]
   },
 
   "berserker": {
@@ -28,7 +28,7 @@
     "core_damage": 2,
     "radius": 0.5,
     "height": 1.45,
-    "color": [0.9, 0.5, 0.32]
+    "color": [0.941, 0.569, 0.235]
   },
 
   "troll": {
@@ -43,6 +43,6 @@
     "core_damage": 5,
     "radius": 0.78,
     "height": 2.1,
-    "color": [0.35, 0.62, 0.45]
+    "color": [0.306, 0.549, 0.388]
   }
 }

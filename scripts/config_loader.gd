@@ -8,6 +8,7 @@ const OVERRIDE_DIR := "user://data/"
 var config: Dictionary = {}
 var enemies: Dictionary = {}
 var traps: Dictionary = {}
+var art: Dictionary = {}
 var levels: Dictionary = {}
 var errors: PackedStringArray = []
 
@@ -19,6 +20,7 @@ func load_all() -> void:
 	config = _load_json("config.json")
 	enemies = _load_json("enemies.json")
 	traps = _load_json("traps.json")
+	art = _load_json("art.json")
 	levels = {}
 	for lv in _list_levels():
 		var d := _load_json("levels/%s.json" % lv)
