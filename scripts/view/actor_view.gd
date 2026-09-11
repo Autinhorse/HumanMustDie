@@ -15,6 +15,12 @@ var ok := false
 
 var _tint_mats: Array[StandardMaterial3D] = []
 var _base_color := Color.WHITE
+var _leg_swing := 57.0
+var _arm_swing := 60.0
+var _sword_arm_ratio := 0.55
+var _torso_lean := 14.0
+var _head_lean := 4.0
+var _bob := 0.06
 var _sword_free := false
 var _sword_vel := Vector3.ZERO
 var _sword_spin := Vector3.ZERO
@@ -37,10 +43,21 @@ func setup(model_id: String, height: float, color: Color) -> bool:
 		if node != null:
 			parts[n] = node
 			rest[n] = node.transform
+	_load_anim_params()
 	_collect_tint_materials(model_root)
 	set_color(color)
 	ok = parts.has("LegL") and parts.has("LegR")
 	return ok
+
+## 动作参数放在 data/art.json 的 anim 段，改完 F5 就能试
+func _load_anim_params() -> void:
+	var a: Dictionary = Cfg.art.get("anim", {})
+	_leg_swing = float(a.get("leg_swing_deg", _leg_swing))
+	_arm_swing = float(a.get("arm_swing_deg", _arm_swing))
+	_sword_arm_ratio = float(a.get("sword_arm_ratio", _sword_arm_ratio))
+	_torso_lean = float(a.get("torso_lean_deg", _torso_lean))
+	_head_lean = float(a.get("head_lean_deg", _head_lean))
+	_bob = float(a.get("bob_height", _bob))
 
 func _find(node: Node, name: String) -> Node3D:
 	if node.name == name and node is Node3D:
@@ -99,25 +116,25 @@ func _rot(part: String, euler: Vector3) -> void:
 
 ## phase 随走过的距离推进；intensity 0=站定 1=全速
 func set_run(phase: float, intensity: float) -> void:
-	var sw: float = deg_to_rad(38.0) * intensity
-	var aw: float = deg_to_rad(30.0) * intensity
+	var sw: float = deg_to_rad(_leg_swing) * intensity
+	var aw: float = deg_to_rad(_arm_swing) * intensity
 	var s := sin(phase)
 	_rot("LegL", Vector3(s * sw, 0, 0))
 	_rot("LegR", Vector3(-s * sw, 0, 0))
 	_rot("ArmL", Vector3(-s * aw, 0, deg_to_rad(6.0)))
 	# 持剑那条手臂摆幅小一些，剑跟着甩太厉害会看不清朝向
-	_rot("ArmR", Vector3(s * aw * 0.55, 0, -deg_to_rad(6.0)))
+	_rot("ArmR", Vector3(s * aw * _sword_arm_ratio, 0, -deg_to_rad(6.0)))
 	# 剑反向抵消手臂的摆动：等距相机下剑一旦偏离竖直就会被压扁成横的，
 	# 不同朝向看起来就像"剑一会朝上一会朝下"
 	if not _sword_free:
 		_rot_compose("Sword", Vector3(-s * aw, 0, 0))
 	# 负角才是前倾：绕 +X 转会把"上"带向 +Z，而角色的前方是 -Z
-	_rot("Torso", Vector3(-deg_to_rad(14.0) * intensity, 0, 0))
-	_rot("Head", Vector3(-deg_to_rad(4.0) * intensity, 0, 0))
+	_rot("Torso", Vector3(-deg_to_rad(_torso_lean) * intensity, 0, 0))
+	_rot("Head", Vector3(-deg_to_rad(_head_lean) * intensity, 0, 0))
 	_stabilize_sword()
 	if model_root != null:
 		# 两条腿各迈一步 = 一个上下起伏周期
-		model_root.position.y = absf(sin(phase)) * 0.06 * intensity
+		model_root.position.y = absf(sin(phase)) * _bob * intensity
 
 ## 手臂摆动时把剑锁回静止朝向。
 ## 不能简单地"绕某个轴反向转同样角度" —— glTF 转 Y-up 之后剑的局部轴和手臂的

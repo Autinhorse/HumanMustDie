@@ -51,6 +51,17 @@
     "aspect_max": 4.5
   },
 
+  "anim": {
+    "_comment": "跑步动作。相位由走过的距离驱动，所以 stride_ratio 越大步子越大、一个循环耗时越久；其余是各部件的摆动/前倾角度。",
+    "leg_swing_deg": 57.0,
+    "arm_swing_deg": 60.0,
+    "sword_arm_ratio": 0.55,
+    "torso_lean_deg": 14.0,
+    "head_lean_deg": 4.0,
+    "bob_height": 0.06,
+    "stride_ratio": 0.715
+  },
+
   "environment": {
     "sky_top":     "#6B8C91",
     "sky_horizon": "#A6C1C0",

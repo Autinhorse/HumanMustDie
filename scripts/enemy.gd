@@ -174,7 +174,9 @@ func _animate(prev_pos: Vector3, dt: float) -> void:
 	if dist > 0.0005:
 		actor.rotation.y = atan2(-delta.x, -delta.z)
 	if state == State.GROUND:
-		var stride: float = max(height * 0.55, 0.2)
+		# 步幅越大，一个跑步循环走过的距离越长、耗时也越长
+		var ratio: float = float(Cfg.art.get("anim", {}).get("stride_ratio", 0.715))
+		var stride: float = max(height * ratio, 0.2)
 		run_phase += dist / stride * PI
 		var intensity: float = clampf(dist / max(speed * dt, 0.0001), 0.0, 1.0)
 		actor.set_run(run_phase, intensity)
