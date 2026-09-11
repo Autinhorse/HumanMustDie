@@ -101,9 +101,9 @@ func reset() -> void:
 		return
 	flow = FlowField.new()
 	flow.build(grid, core_cells)
-	entrance_cells = flow.find_entrance_cells()
+	entrance_cells = _resolve_entrance()
 	if entrance_cells.is_empty():
-		load_error = "找不到入口：地图边缘没有可通往核心的地面/桥面"
+		load_error = "找不到入口：地图边缘没有可通往核心的地面/桥面，关卡里也没有写 entrance"
 		return
 
 	seed_value = Cfg.int_at("sim.seed", 12345)
@@ -117,8 +117,58 @@ func reset() -> void:
 	sandbox = false
 	_spawn_queue.clear()
 	stats = RunStats.new()
-	_log("关卡「%s」载入完成，入口 %d 格，随机种子 %d" % [String(level.get("name", level_id)), entrance_cells.size(), seed_value])
+	var how: String = "关卡指定" if level.has("entrance") else "自动推导"
+	_log("关卡「%s」载入完成，入口 %d 格（%s），随机种子 %d" % [
+		String(level.get("name", level_id)), entrance_cells.size(), how, seed_value])
 	changed.emit()
+
+## 入口：关卡里写了 entrance 就用写的，没写就按规则自动推
+## （地图边缘上离核心最远的那个连通开口）。
+## entrance 支持 "x,y" 和 "x,y-x,y" 两种写法，可以列多段 —— 多段就是多个入口。
+func _resolve_entrance() -> Array[Vector2i]:
+	var spec: Variant = level.get("entrance", null)
+	if spec != null:
+		var listed := _parse_cells(spec)
+		var good: Array[Vector2i] = []
+		var bad: Array[String] = []
+		for c in listed:
+			if not grid.is_walkable(c):
+				bad.append("%s 不是地面/桥面" % str(c))
+			elif not flow.reachable(c):
+				bad.append("%s 走不到核心" % str(c))
+			else:
+				good.append(c)
+		for b in bad:
+			_log("关卡 entrance 里的 %s，已忽略" % b)
+		if not good.is_empty():
+			return good
+		_log("关卡 entrance 一个可用的都没有，改用自动推导")
+	return flow.find_entrance_cells()
+
+## 解析 "x,y" / "x,y-x,y" / [x,y]，返回展开后的格子
+func _parse_cells(spec: Variant) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var items: Array = spec if typeof(spec) == TYPE_ARRAY else [spec]
+	for item in items:
+		if typeof(item) == TYPE_ARRAY and item.size() >= 2:
+			out.append(Vector2i(int(item[0]), int(item[1])))
+			continue
+		var text := String(item).strip_edges()
+		if text == "":
+			continue
+		var ends := text.split("-")
+		var a := _parse_one(ends[0])
+		var b := _parse_one(ends[1]) if ends.size() > 1 else a
+		for y in range(min(a.y, b.y), max(a.y, b.y) + 1):
+			for x in range(min(a.x, b.x), max(a.x, b.x) + 1):
+				out.append(Vector2i(x, y))
+	return out
+
+func _parse_one(text: String) -> Vector2i:
+	var parts := text.strip_edges().split(",")
+	if parts.size() < 2:
+		return Vector2i(-1, -1)
+	return Vector2i(int(parts[0].strip_edges()), int(parts[1].strip_edges()))
 
 func _cache_config() -> void:
 	wall_height = Cfg.num("grid.wall_height", 1.0)

@@ -25,6 +25,8 @@
     "22222111112222"
   ],
 
+  "_entrance_comment": "不写 entrance 就按规则自动推：地图边缘上离核心最远的那个连通开口。写了就以写的为准，例如 \"entrance\": [\"5,19-9,19\"]。",
+
   "allowed_traps": ["spikes", "tar", "launcher", "push_wall", "saw"],
 
   "waves": [

@@ -14,6 +14,7 @@ func _ready() -> void:
 	_run("T2 中型敌人需累计冲击才位移", _test_medium_accumulate)
 	_run("T3 重型只短移，且撞伤沿途小怪", _test_heavy_short_push)
 	_run("T4 完整一波跑通不崩溃", _test_full_wave)
+	_run("T6 关卡可以显式指定入口", _test_entrance_override)
 	await _run_scene_test()
 
 	print("\n".join(_lines))
@@ -199,6 +200,30 @@ func _test_heavy_short_push() -> PackedStringArray:
 	_check(int(g.stats.kills_by_cause.get("collision", 0)) >= 1 or victim.hp < victim_hp,
 		"撞击伤害没有被统计", errs)
 	g.queue_free()
+	return errs
+
+func _test_entrance_override() -> PackedStringArray:
+	var errs := PackedStringArray()
+	# 走廊关没写 entrance，走自动推导：底边那段最远的开口
+	var g := _new_game()
+	_check(g.entrance_cells.size() == 5, "走廊关应自动推出 5 格入口，实为 %d" % g.entrance_cells.size(), errs)
+	g.queue_free()
+
+	# 地牢关写了 entrance，应当严格按写的来
+	if not Cfg.levels.has("dw_01"):
+		errs.append("找不到 dw_01 关卡")
+		return errs
+	var g2 := Game.new()
+	add_child(g2)
+	g2.paused = true
+	g2.start("dw_01")
+	_check(g2.load_error == "", "dw_01 载入失败: " + g2.load_error, errs)
+	if g2.load_error == "":
+		var got := g2.entrance_cells.duplicate()
+		got.sort()
+		var want: Array[Vector2i] = [Vector2i(19, 14), Vector2i(20, 14)]
+		_check(got == want, "dw_01 的入口应当就是关卡里写的 %s，实为 %s" % [str(want), str(got)], errs)
+	g2.queue_free()
 	return errs
 
 func _test_full_wave() -> PackedStringArray:

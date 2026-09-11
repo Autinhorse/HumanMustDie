@@ -98,8 +98,33 @@
 
 加一种新触发/新作用器＝在 `scripts/traps/` 对应文件里加一个 `match` 分支，其余四段不用动。
 
-### `data/levels/corridor_01.json`
-`grid` 是逐行的格子类型字符串，`allowed_traps` 控制工具条，`waves[].groups[]` 是 `{enemy, count, interval, delay}`。
+### `data/levels/*.json`
+| 字段 | 说明 |
+| --- | --- |
+| `grid` | 逐行的格子类型字符串：`0 空地 1 地面 2 墙 3 障碍 4 桥面 5 核心` |
+| `entrance` | **敌人从哪进来**。不写就自动推（见下），写了就以写的为准 |
+| `allowed_traps` | 这一关工具条上有哪些机关 |
+| `waves[].groups[]` | `{enemy, count, interval, delay}` |
+
+**入口怎么定**
+
+不写 `entrance` 时按规则自动推：**地图边缘上离核心最远的那个连通开口**。
+所以边缘只留一处开口时最省事，多留几处会互相抢。
+
+要指定就写 `entrance`，支持单格 `"x,y"` 和矩形 `"x,y-x,y"`，可以列多段
+（多段就是多个入口，敌人会从所有列出的格子里随机出生）：
+
+```json
+"entrance": ["19,14-20,14"]
+"entrance": ["5,19", "9,19"]          // 两个各一格的入口
+"entrance": [[19, 14], [20, 14]]      // 也支持 [x,y] 数组写法
+```
+
+坐标是**格子坐标**，`x` 从左往右、`y` 从上往下，都从 0 开始，和 `grid` 里
+字符串的行列一一对应。
+
+写的格子会被校验：不是地面/桥面、或者走不到核心的，会在日志里报出来并忽略；
+全都不可用时回退到自动推导。载入日志会写明这一关用的是「关卡指定」还是「自动推导」。
 
 ## 5. 代码结构
 
@@ -234,7 +259,8 @@ Root
 改模型比例改 `build_swordman.py` 里的 `P`，改配色改 `COLORS`，改完跑一次：
 
 ```
-toolsebuild_models.bat            双击也行；加 --pose 顺便出姿势检查图
+tools
+ebuild_models.bat            双击也行；加 --pose 顺便出姿势检查图
 python tools/rebuild_models.py      跨平台的话跑这个
 ```
 

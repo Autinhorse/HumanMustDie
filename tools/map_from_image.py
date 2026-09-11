@@ -254,6 +254,7 @@ def main():
         "name": args.name or os.path.basename(args.image),
         "_comment": "由 tools/map_from_image.py 从 %s 转换而来。格子类型：0 空地 1 地面 2 墙 3 障碍 4 桥 5 核心。" % os.path.basename(args.image),
         "grid": ["".join(str(v) for v in row) for row in grid],
+        "entrance": [p.strip() for p in args.entrance.split(";") if p.strip()] if args.entrance else [],
         "allowed_traps": ["spikes", "tar", "launcher", "push_wall", "saw"],
         "waves": [
             {"name": "第1波 · 小兵试水", "groups": [{"enemy": "grunt", "count": 10, "interval": 0.5, "delay": 0.0}]},
