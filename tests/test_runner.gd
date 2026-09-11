@@ -219,10 +219,14 @@ func _test_entrance_override() -> PackedStringArray:
 	g2.start("dw_01")
 	_check(g2.load_error == "", "dw_01 载入失败: " + g2.load_error, errs)
 	if g2.load_error == "":
-		var got := g2.entrance_cells.duplicate()
-		got.sort()
-		var want: Array[Vector2i] = [Vector2i(19, 14), Vector2i(20, 14)]
-		_check(got == want, "dw_01 的入口应当就是关卡里写的 %s，实为 %s" % [str(want), str(got)], errs)
+		# 不写死坐标 —— 关卡随时会被手工调整；这里验证的是"以关卡里写的为准"这个机制
+		var spec: Variant = Cfg.levels["dw_01"].get("entrance", null)
+		_check(spec != null, "dw_01 应当写了 entrance 字段", errs)
+		if spec != null:
+			var listed: Array[Vector2i] = g2._parse_cells(spec)
+			_check(not g2.entrance_cells.is_empty(), "入口不该为空", errs)
+			for c in g2.entrance_cells:
+				_check(listed.has(c), "入口 %s 不在关卡写的 entrance 里，说明没按关卡来" % str(c), errs)
 	g2.queue_free()
 	return errs
 

@@ -82,6 +82,14 @@ func set_state_tint(hp_ratio: float, slowed: bool) -> void:
 
 # ---------------------------------------------------------------- 动作
 
+## 在静止姿势的基础上再叠一个旋转（用于抵消父节点的摆动）
+func _rot_compose(part: String, euler: Vector3) -> void:
+	if not parts.has(part):
+		return
+	var n: Node3D = parts[part]
+	var t: Transform3D = rest[part]
+	n.transform = Transform3D(t.basis * Basis.from_euler(euler), t.origin)
+
 func _rot(part: String, euler: Vector3) -> void:
 	if not parts.has(part):
 		return
@@ -97,12 +105,30 @@ func set_run(phase: float, intensity: float) -> void:
 	_rot("LegL", Vector3(s * sw, 0, 0))
 	_rot("LegR", Vector3(-s * sw, 0, 0))
 	_rot("ArmL", Vector3(-s * aw, 0, deg_to_rad(6.0)))
-	_rot("ArmR", Vector3(s * aw, 0, -deg_to_rad(6.0)))
+	# 持剑那条手臂摆幅小一些，剑跟着甩太厉害会看不清朝向
+	_rot("ArmR", Vector3(s * aw * 0.55, 0, -deg_to_rad(6.0)))
+	# 剑反向抵消手臂的摆动：等距相机下剑一旦偏离竖直就会被压扁成横的，
+	# 不同朝向看起来就像"剑一会朝上一会朝下"
+	if not _sword_free:
+		_rot_compose("Sword", Vector3(-s * aw, 0, 0))
 	_rot("Torso", Vector3(deg_to_rad(7.0) * intensity, 0, 0))
 	_rot("Head", Vector3(-deg_to_rad(5.0) * intensity, 0, 0))
+	_stabilize_sword()
 	if model_root != null:
 		# 两条腿各迈一步 = 一个上下起伏周期
 		model_root.position.y = absf(sin(phase)) * 0.06 * intensity
+
+## 手臂摆动时把剑锁回静止朝向。
+## 不能简单地"绕某个轴反向转同样角度" —— glTF 转 Y-up 之后剑的局部轴和手臂的
+## 摆动轴对不上，那样转反而会再加一次摆幅（实测剑会偏离竖直 40 度）。
+## 这里直接用矩阵算：让剑的世界朝向等于"手臂没摆动时"的朝向。
+func _stabilize_sword() -> void:
+	if _sword_free or not parts.has("Sword") or not parts.has("ArmR"):
+		return
+	var arm: Node3D = parts["ArmR"]
+	var sw_rest: Transform3D = rest["Sword"]
+	var b: Basis = arm.transform.basis.inverse() * (rest["ArmR"] as Transform3D).basis * sw_rest.basis
+	(parts["Sword"] as Node3D).transform = Transform3D(b, sw_rest.origin)
 
 func set_idle() -> void:
 	set_run(0.0, 0.0)

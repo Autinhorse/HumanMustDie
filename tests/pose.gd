@@ -13,6 +13,65 @@ const POSES := [
 ]
 
 func _ready() -> void:
+	if "--facings" in OS.get_cmdline_user_args():
+		_build_facings()
+		await _maybe_shot()
+		return
+	_build_poses()
+
+## 八个朝向 x 两个跑步相位，用游戏里的相机角度看 —— 复现"剑一会向上一会向下"
+func _build_facings() -> void:
+	_common_world()
+	var i := 0
+	for phase in [PI * 0.5, PI * 1.5]:
+		for k in 8:
+			var a := ActorView.new()
+			add_child(a)
+			a.setup("swordman", 1.0, Color(0.886, 0.290, 0.482))
+			a.position = Vector3((k - 3.5) * 1.5, 0, (i - 0.5) * 2.2)
+			a.rotation_degrees.y = k * 45.0
+			a.set_run(phase, 1.0)
+			if i == 0 and a.parts.has("Sword"):
+				var sw: Node3D = a.parts["Sword"]
+				var b := sw.global_transform.basis
+				print("yaw=%3d  局部+Z在世界=%s  局部+Y在世界=%s" % [
+					k * 45, str(b * Vector3(0, 0, 1)), str(b * Vector3(0, 1, 0))])
+		i += 1
+	var cam := Camera3D.new()
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 9.0
+	var pivot := Vector3(0, 0.5, 0)
+	var elev := deg_to_rad(45.0)
+	var yaw := deg_to_rad(-40.0)
+	cam.position = pivot + Vector3(cos(elev) * sin(yaw), sin(elev), cos(elev) * cos(yaw)) * 14.0
+	add_child(cam)
+	cam.look_at(pivot, Vector3.UP)
+	cam.current = true
+
+func _common_world() -> void:
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color(0.78, 0.83, 0.83)
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color(0.66, 0.76, 0.76)
+	e.ambient_light_energy = 0.35
+	env.environment = e
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-42, 35, 0)
+	sun.light_energy = 1.1
+	sun.shadow_enabled = true
+	add_child(sun)
+	var ground := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(40, 40)
+	ground.mesh = pm
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.86, 0.83, 0.76)
+	ground.material_override = gm
+	add_child(ground)
+
+func _build_poses() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
