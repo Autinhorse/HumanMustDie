@@ -5,3 +5,7 @@ export_presets.cfg
 *.translation
 build/
 logs/
+
+# Blender 渲染产物（可用 tools/blender/build_island.py 重新生成），只保留风格定稿图
+renders/*
+!renders/island_style_ref.png
