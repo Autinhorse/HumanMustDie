@@ -11,6 +11,7 @@
 | --- | --- |
 | 编辑器打开 | 用 Godot 4.7 打开 `project.godot` |
 | 直接运行 | `C:\Godot4.7\Godot_v4.7-stable_win64.exe --path .` |
+| 指定关卡运行 | `... --path . -- --level dw_01`（关卡 id = `data/levels/` 下的文件名） |
 | 跑自动化测试 | `C:\Godot4.7\Godot_v4.7-stable_win64_console.exe --headless --path . res://tests/run_tests.tscn` |
 | 看连锁演示（自动搭杀戮区并开打） | `C:\Godot4.7\Godot_v4.7-stable_win64.exe --path . res://tests/demo.tscn` |
 
@@ -174,6 +175,28 @@ blender --background --python tools/blender/build_island.py -- \n    --project .
 ```
 Godot_v4.7-stable_win64.exe --path . res://tests/demo.tscn -- --shot D:/out.png --shot-delay 7
 ```
+
+## 6.6 从截图转关卡（v0.0.7 起）
+
+`tools/map_from_image.py` 能把地图截图转成我们的关卡 JSON。做法是对图里的颜色做
+k-means，按「最蓝 / 最亮的暖色 / 中间暖色 / 最暗」自动分出空地、墙、地面和图外；
+再从蓝色块的边界游程自动推出格子间距（相邻档位之差就是间距）和原点；最后每格取
+中心区域投票定类型，砖缝的暗色和图标的白色不参与投票。
+
+转 `ref/DungeonWarfareMap01.png` 用的命令：
+
+```
+python tools/map_from_image.py --image ref/DungeonWarfareMap01.png     --out data/levels/dw_01.json --name "地牢战争 01（由截图转换）"     --size 26x15 --core 2,3 --core-size 2x2     --wall "9,2-11,4;0,3-0,4" --void "25,3;25,9;10,14"     --entrance "19,14-20,14" --preview renders/dw_preview.png
+```
+
+- `--core` / `--core-size`：核心左上角与尺寸（图里的图标识别不了，要手工指定）
+- `--wall` / `--void` / `--entrance`：事后修正，`x,y` 或 `x,y-x,y`，分号分隔多段
+- `--size` / `--pitch` / `--origin`：不传就自动推；自动结果不对时再手填
+- `--pad`：每格采样时四周留多少不采（默认 0.2）。调大能减少邻格污染，但太大会因为
+  砖缝的暗色被排除而样本太少、反而更噪
+
+转完会打印**连通性检查**：有多少可行走格、有几格走不到核心、地图边缘有哪些开口。
+我们的引擎是按「边缘上离核心最远的连通开口」自动定入口的，所以边缘只留一处开口最省事。
 
 ## 7. 已知问题 / 下一步
 

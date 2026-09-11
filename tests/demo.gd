@@ -10,6 +10,12 @@ func _ready() -> void:
 	var g: Game = m.game
 	if g.load_error != "":
 		return
+	if g.level_id != "corridor_01":
+		# 别的关卡坐标对不上，只开一波看地形
+		m.hud.toggle_stats()
+		g.start_wave()
+		await _maybe_screenshot()
+		return
 	g.gold = 99999
 	g.place("tar", Vector2i(6, 11), Vector2i(0, -1))
 	g.place("tar", Vector2i(7, 11), Vector2i(0, -1))

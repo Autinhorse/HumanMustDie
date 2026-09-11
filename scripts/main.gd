@@ -30,7 +30,7 @@ func _ready() -> void:
 	game = Game.new()
 	game.name = "Game"
 	add_child(game)
-	game.start("corridor_01")
+	game.start(_level_from_cmdline())
 
 	board = BoardView.new()
 	add_child(board)
@@ -40,6 +40,14 @@ func _ready() -> void:
 	add_child(hud)
 	hud.setup(game, self)
 	_refresh_board()
+
+## 命令行选关：--level <id>，默认走廊关
+func _level_from_cmdline() -> String:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--level" and i + 1 < args.size():
+			return String(args[i + 1])
+	return "corridor_01"
 
 func _refresh_board() -> void:
 	if game.load_error != "":
