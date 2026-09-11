@@ -14,7 +14,8 @@
    ├ LegL           原点在左髋
    └ LegR           原点在右髋
 
-模型总高 1.0，朝向 +Y（glTF 转 Y-up 之后正好是 Godot 的前方 -Z）。
+模型总高 1.0，**朝 +Y**（面罩在 +Y 面）。glTF 转 Y-up 后 Blender +Y -> -Z，
+正好是 Godot 的前方，所以 Godot 里用 atan2(-dx, -dz) 转向就对。
 
 用法：
   blender --background --python tools/blender/build_swordman.py -- \
@@ -30,15 +31,15 @@ from mathutils import Vector
 # ----------------------------------------------------------------- 比例（总高 1.0）
 
 P = {
-    "leg_h": 0.26, "leg_w": 0.13, "leg_d": 0.15, "leg_gap": 0.03,
+    "leg_h": 0.28, "leg_w": 0.13, "leg_d": 0.15, "leg_gap": 0.03,
     "boot_h": 0.07, "boot_over": 0.015,
-    "torso_h": 0.34, "torso_w": 0.36, "torso_d": 0.23,
+    "torso_h": 0.38, "torso_w": 0.36, "torso_d": 0.23,
     "belt_h": 0.055,
-    "head_h": 0.38, "head_w": 0.44, "head_d": 0.38, "head_top_shrink": 0.66,
+    "head_h": 0.33, "head_w": 0.38, "head_d": 0.33, "head_top_shrink": 0.66,
     "head_straight": 0.70,   # 头盔下面这部分是直筒，上面才斜切
     "collar_h": 0.06,
     "visor_y": 0.40, "visor_h": 0.085, "visor_w": 0.62,
-    "arm_w": 0.105, "arm_d": 0.135, "upper_arm": 0.20, "fore_arm": 0.11,
+    "arm_w": 0.105, "arm_d": 0.135, "upper_arm": 0.22, "fore_arm": 0.12,
     "shoulder_drop": 0.03,
     "blade_len": 0.42, "blade_w": 0.075, "blade_d": 0.028, "tip_len": 0.10,
     "guard_w": 0.20, "guard_h": 0.035, "grip_len": 0.09,
@@ -142,7 +143,7 @@ def build():
         (P["torso_w"] * 1.04, P["torso_d"] * 1.04, P["belt_h"]), "metal_gold", torso)
     # 胸口菱形：压扁的方板绕 Y 转 45 度
     box("Emblem", (0, 0, 0), (0.10, 0.02, 0.10), "metal_gold", torso, bevel=0.004,
-        rotation=(0, math.radians(45), 0)).location = (0, -P["torso_d"] / 2 - 0.004, torso_h * 0.60)
+        rotation=(0, math.radians(45), 0)).location = (0, P["torso_d"] / 2 + 0.004, torso_h * 0.60)
 
     # --- 头：原点在颈部
     head = joint("Head", (0, 0, torso_h), torso)
@@ -155,13 +156,13 @@ def build():
     box("HelmetTop", (0, 0, (straight_top + head_h) / 2),
         (P["head_w"], P["head_d"], head_h - straight_top), "armor_primary", head,
         top_scale=P["head_top_shrink"])
-    box("Visor", (0, -P["head_d"] / 2 - 0.002, head_h * P["visor_y"]),
+    box("Visor", (0, P["head_d"] / 2 + 0.002, head_h * P["visor_y"]),
         (P["head_w"] * P["visor_w"], 0.03, P["visor_h"]), "visor_black", head, bevel=0.004)
 
     # --- 手臂：原点在肩
     shoulder_z = torso_h - P["shoulder_drop"]
     arm_x = P["torso_w"] * 1.04 / 2 + P["arm_w"] / 2 + 0.008
-    for side, sx in (("L", 1.0), ("R", -1.0)):
+    for side, sx in (("L", -1.0), ("R", 1.0)):
         arm = joint("Arm%s" % side, (sx * arm_x, 0, shoulder_z), torso)
         box("Upper%s" % side, (0, 0, -P["upper_arm"] / 2),
             (P["arm_w"], P["arm_d"], P["upper_arm"]), "cloth_red", arm)
@@ -172,7 +173,7 @@ def build():
 
     # --- 腿：原点在髋
     leg_x = P["leg_w"] / 2 + P["leg_gap"] / 2
-    for side, sx in (("L", 1.0), ("R", -1.0)):
+    for side, sx in (("L", -1.0), ("R", 1.0)):
         leg = joint("Leg%s" % side, (sx * leg_x, 0, leg_top), root)
         box("Shin%s" % side, (0, 0, -(P["leg_h"] - P["boot_h"]) / 2),
             (P["leg_w"], P["leg_d"], P["leg_h"] - P["boot_h"]), "armor_dark", leg)
@@ -185,8 +186,10 @@ def build():
 
 def build_sword(arm, hand_z):
     """剑：原点在握把，挂在右臂下。死亡动画里把它从手上解绑扔出去。"""
-    # 参考图里剑斜向前下方；绕 X 转让剑尖朝前下
-    sword = joint("Sword", (0, -0.02, hand_z - 0.01), arm, rotation=(math.radians(138), 0, 0))
+    # 剑尖朝上握在手里：刀身沿局部 +Z，稍微往后仰一点，别戳到头盔
+    # 绕 Y 转 = 刀身往身体外侧倒，不然升起来会被上臂挡住
+    sword = joint("Sword", (0.022, 0.03, hand_z + 0.015), arm,
+                  rotation=(math.radians(-7), math.radians(17), 0))
     box("Grip", (0, 0, -P["grip_len"] / 2), (0.036, 0.036, P["grip_len"]), "armor_dark", sword)
     box("Guard", (0, 0, 0), (P["guard_w"], 0.045, P["guard_h"]), "metal_gold", sword)
     box("Pommel", (0, 0, -P["grip_len"]), (0.05, 0.05, 0.035), "metal_gold", sword)
@@ -229,7 +232,8 @@ def render_preview(path):
     cam_data.type = "ORTHO"
     cam_data.ortho_scale = 1.55
     cam = bpy.data.objects.new("Cam", cam_data)
-    cam.location = (1.15, -1.55, 1.05)
+    # 角色朝 +Y，所以相机放到 +Y 一侧才拍到正面
+    cam.location = (-1.15, 1.55, 1.05)
     d = (Vector((0, 0, 0.52)) - Vector(cam.location)).normalized()
     cam.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
     scene.collection.objects.link(cam)

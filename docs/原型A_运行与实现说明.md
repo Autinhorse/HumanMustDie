@@ -228,6 +228,15 @@ Root
 尸体不再参与模拟（不挡路、不吃伤害），播完倒地动画后按 `combat.corpse_life` 清掉；
 掉下地图和抵达核心的不留尸体。
 
+**朝向约定**：模型在 Blender 里朝 **+Y**（面罩在 +Y 面）。glTF 转 Y-up 后 Blender +Y → Godot -Z，
+正好是 Godot 的前方，所以 `enemy.gd` 里用 `atan2(-dx, -dz)` 转向就对。面罩放反了整个人就会倒着跑。
+
+**重新导出后必须跑一次编辑器导入**，否则游戏里用的还是旧模型（非编辑器模式不会重新导入 glb）：
+
+```
+Godot_v4.7-stable_win64_console.exe --headless --editor --quit --path .
+```
+
 改模型比例改 `build_swordman.py` 里的 `P`，改配色改 `COLORS`。改完重新导出：
 
 ```
