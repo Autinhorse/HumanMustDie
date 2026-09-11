@@ -428,12 +428,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_E:
 			_yaw += Cfg.num("camera.yaw_step_deg", 45.0)
 			_update_camera()
-		KEY_Z:
-			game.sandbox_spawn("grunt", 8)
-		KEY_C:
-			game.sandbox_spawn("berserker", 3)
-		KEY_V:
-			game.sandbox_spawn("troll", 1)
+		KEY_Z, KEY_C, KEY_V, KEY_B:
+			_sandbox_spawn_key(k)
 		_:
 			var allowed := game.allowed_traps()
 			for i in allowed.size():
@@ -472,6 +468,22 @@ func set_pitch(deg: float) -> void:
 func set_zoom(size: float) -> void:
 	_ortho_size = clampf(size, Cfg.num("camera.ortho_min", 10.0), Cfg.num("camera.ortho_max", 90.0))
 	_update_camera()
+
+## 沙盒放怪：Z/C/V/B 按 enemies.json 里的顺序对应前四种敌人，加了新敌人自动有键位
+const SANDBOX_KEYS := [KEY_Z, KEY_C, KEY_V, KEY_B]
+
+func _sandbox_spawn_key(key: int) -> void:
+	var ids: Array = []
+	for id in Cfg.enemies.keys():
+		if typeof(Cfg.enemies[id]) == TYPE_DICTIONARY:
+			ids.append(String(id))
+	var i := SANDBOX_KEYS.find(key)
+	if i < 0 or i >= ids.size():
+		return
+	var data: Dictionary = Cfg.enemies[ids[i]]
+	# 越大越贵的敌人放得越少
+	var n: int = maxi(1, int(round(60.0 / max(float(data.get("hp", 40)), 1.0))))
+	game.sandbox_spawn(ids[i], n)
 
 func _zoom(sign_dir: int) -> void:
 	_ortho_size = clampf(_ortho_size + float(sign_dir) * Cfg.num("camera.zoom_step", 3.0),

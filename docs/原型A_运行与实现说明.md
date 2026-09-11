@@ -14,6 +14,7 @@
 | 指定关卡运行 | `... --path . -- --level dw_01`（关卡 id = `data/levels/` 下的文件名） |
 | 跑自动化测试 | `C:\Godot4.7\Godot_v4.7-stable_win64_console.exe --headless --path . res://tests/run_tests.tscn` |
 | 看连锁演示（自动搭杀戮区并开打） | `C:\Godot4.7\Godot_v4.7-stable_win64.exe --path . res://tests/demo.tscn` |
+| 只看某一种敌人 | `... res://tests/demo.tscn -- --spawn shieldman:6`（直接在入口放 6 个盾兵，跳过波次） |
 
 测试全部通过时退出码为 0，失败为 1，可直接接 CI。
 
@@ -31,7 +32,7 @@
 | `空格` | 暂停 / 继续 |
 | `Tab` | 战斗统计面板 |
 | `WASD` / `Q`·`E` / 滚轮 | 平移 / 转视角 / 缩放 |
-| `F1` | 沙盒模式：无限金币、战斗中也能施工、`Z`/`C`/`V` 手动放 小兵/狂战士/巨魔 |
+| `F1` | 沙盒模式：无限金币、战斗中也能施工、`Z`/`C`/`V`/`B` 手动放怪（按 `enemies.json` 里的顺序对应前四种，加了新敌人自动有键位，血越厚放得越少） |
 | `F2` | 重开 |
 | `F5` | 重载 `data/` 下的配置并重开本局（改数值不用重启） |
 | `F12` | 截图，存到 `%APPDATA%/Godot/app_userdata/.../shots/` |
@@ -235,7 +236,8 @@ python tools/map_from_image.py --image ref/DungeonWarfareMap01.png     --out dat
 - `--variant shieldman` → `assets/models/shieldman.glb`，左臂抬起来托一面椭圆盾
   （金色边框 + 贯穿上下左右的金色十字），右手照旧持剑
 
-`toolsebuild_models.bat` 会把两个都生成。**不做骨骼**：每个部件的原点放在关节上
+`tools
+ebuild_models.bat` 会把两个都生成。**不做骨骼**：每个部件的原点放在关节上
 （颈 / 肩 / 髋 / 握把），Godot 里直接给节点转角度就能做动作。
 
 ```

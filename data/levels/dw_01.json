@@ -54,6 +54,12 @@
           "count": 10,
           "interval": 0.3,
           "delay": 6.0
+        },
+        {
+          "enemy": "shieldman",
+          "count": 1,
+          "interval": 1.0,
+          "delay": 4.0
         }
       ]
     },
@@ -71,6 +77,12 @@
           "count": 4,
           "interval": 1.2,
           "delay": 3.0
+        },
+        {
+          "enemy": "shieldman",
+          "count": 2,
+          "interval": 1.5,
+          "delay": 4.0
         }
       ]
     },

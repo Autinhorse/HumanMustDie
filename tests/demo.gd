@@ -26,8 +26,24 @@ func _ready() -> void:
 	g.place("launcher", Vector2i(6, 14), Vector2i(0, -1))
 	g.gold = Cfg.int_at("economy.start_gold", 320)
 	m.hud.toggle_stats()
-	g.start_wave()
+	if not _spawn_override(g):
+		g.start_wave()
 	await _maybe_screenshot()
+
+## --spawn <敌人id>[:数量] 直接在入口放一批指定敌人，用来单独看某种敌人
+func _spawn_override(g: Game) -> bool:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--spawn" and i + 1 < args.size():
+			var spec := String(args[i + 1]).split(":")
+			var id := spec[0]
+			var n := int(spec[1]) if spec.size() > 1 else 5
+			g.phase = Game.Phase.COMBAT
+			for k in n:
+				g.spawn(id)
+			print("SPAWNED %s x%d" % [id, n])
+			return true
+	return false
 
 ## 给美术调参用：等几秒让战斗铺开，截一张图存盘然后退出
 func _maybe_screenshot() -> void:

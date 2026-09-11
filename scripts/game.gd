@@ -551,7 +551,7 @@ func toggle_sandbox() -> void:
 	sandbox = not sandbox
 	if sandbox:
 		gold = Cfg.int_at("debug.sandbox_gold", 99999)
-		_log("沙盒模式开启：无限金币、随时可施工，Z/C/V 手动放怪")
+		_log("沙盒模式开启：无限金币、随时可施工，Z/C/V/B 按 enemies.json 顺序手动放怪")
 	else:
 		gold = Cfg.int_at("economy.start_gold", 300)
 		_log("沙盒模式关闭")
