@@ -111,8 +111,9 @@ func set_run(phase: float, intensity: float) -> void:
 	# 不同朝向看起来就像"剑一会朝上一会朝下"
 	if not _sword_free:
 		_rot_compose("Sword", Vector3(-s * aw, 0, 0))
-	_rot("Torso", Vector3(deg_to_rad(7.0) * intensity, 0, 0))
-	_rot("Head", Vector3(-deg_to_rad(5.0) * intensity, 0, 0))
+	# 负角才是前倾：绕 +X 转会把"上"带向 +Z，而角色的前方是 -Z
+	_rot("Torso", Vector3(-deg_to_rad(14.0) * intensity, 0, 0))
+	_rot("Head", Vector3(-deg_to_rad(4.0) * intensity, 0, 0))
 	_stabilize_sword()
 	if model_root != null:
 		# 两条腿各迈一步 = 一个上下起伏周期

@@ -71,6 +71,14 @@ func _common_world() -> void:
 	ground.material_override = gm
 	add_child(ground)
 
+## --yaw 90 可以侧着看，判断前倾和剑的倾角必须用侧视
+func _extra_yaw() -> float:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--yaw" and i + 1 < args.size():
+			return float(args[i + 1])
+	return 0.0
+
 func _build_poses() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -98,7 +106,7 @@ func _build_poses() -> void:
 			get_tree().quit(1)
 			return
 		a.position = Vector3(-(i - (POSES.size() - 1) / 2.0) * spacing, 0, 0)
-		a.rotation_degrees.y = float(p.get("yaw", 0.0))
+		a.rotation_degrees.y = float(p.get("yaw", 0.0)) + _extra_yaw()
 		match String(p["mode"]):
 			"run":
 				a.set_run(float(p["phase"]), float(p["power"]))

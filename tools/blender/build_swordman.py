@@ -190,8 +190,9 @@ def build_sword(arm, hand_z):
     # 外倾角（绕 Y）必须小：等距相机下，往镜头方向倾的线会被压扁成近似水平，
     # 倾得多了不同朝向看起来就会"一会朝上一会朝下"。之前误设成 45 度就是这个毛病。
     # 握把改放到手臂外侧面上，这样只要很小的外倾角就能让刀身避开上臂。
-    sword = joint("Sword", (0.050, 0.025, hand_z + 0.02), arm,
-                  rotation=(math.radians(-4), math.radians(8), 0))
+    # 绕 X 负角 = 刀身往前倾（角色朝 +Y）；绕 Y 小角 = 往身体外侧让开上臂
+    sword = joint("Sword", (0.050, 0.03, hand_z + 0.02), arm,
+                  rotation=(math.radians(-30), math.radians(8), 0))
     box("Grip", (0, 0, -P["grip_len"] / 2), (0.036, 0.036, P["grip_len"]), "armor_dark", sword)
     box("Guard", (0, 0, 0), (P["guard_w"], 0.045, P["guard_h"]), "metal_gold", sword)
     box("Pommel", (0, 0, -P["grip_len"]), (0.05, 0.05, 0.035), "metal_gold", sword)
