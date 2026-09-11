@@ -28,6 +28,7 @@ func _run_scene_test() -> void:
 	var errs := PackedStringArray()
 	var m = load("res://scenes/main.tscn").instantiate()
 	add_child(m)
+	m.switch_level("corridor_01")      # 默认关卡可配，这里的坐标断言只对走廊关成立
 	if m.game.load_error != "":
 		errs.append(m.game.load_error)
 	else:

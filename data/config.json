@@ -16,6 +16,8 @@
     "yaw_deg": -40.0,
     "distance": 60.0,
     "ortho_size": 46.0,
+    "auto_fit": 1,
+    "fit_padding": 1.18,
     "ortho_min": 12.0,
     "ortho_max": 90.0,
     "zoom_step": 3.0,
@@ -28,6 +30,8 @@
     "max_steps_per_frame": 40,
     "speeds": [0.5, 1.0, 2.0, 4.0],
     "default_speed_index": 1,
+    "default_level": "dw_01",
+    "_default_level_comment": "启动时加载哪个关卡；命令行 -- --level <id> 可以覆盖",
     "seed": 20260911
   },
 

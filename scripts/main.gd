@@ -47,7 +47,16 @@ func _level_from_cmdline() -> String:
 	for i in args.size():
 		if args[i] == "--level" and i + 1 < args.size():
 			return String(args[i + 1])
-	return "corridor_01"
+	var d := Cfg.str_at("sim.default_level", "corridor_01")
+	return d if Cfg.levels.has(d) else "corridor_01"
+
+## 切换关卡（界面下拉框用）
+func switch_level(id: String) -> void:
+	if game.level_id == id or not Cfg.levels.has(id):
+		return
+	_cancel()
+	game.start(id)
+	_refresh_board()
 
 func _refresh_board() -> void:
 	if game.load_error != "":
@@ -61,7 +70,10 @@ func _refresh_board() -> void:
 	_pitch = Cfg.num("camera.pitch_deg", -52.0)
 	_ortho_size = Cfg.num("camera.ortho_size", 46.0)
 	_update_camera()
+	if Cfg.num("camera.auto_fit", 1.0) > 0.0:
+		_fit_camera_to_map()
 	hud.rebuild_build_bar()
+	hud.rebuild_level_list()
 	hud.refresh()
 
 func _build_world() -> void:
@@ -428,6 +440,28 @@ func _unhandled_input(event: InputEvent) -> void:
 				if k == KEY_1 + i and i < 9:
 					select_trap(String(allowed[i]))
 					break
+
+## 按地图大小自动取景：把地图四角投到相机平面，算出需要多大的正交高度
+func _fit_camera_to_map() -> void:
+	if game.grid == null:
+		return
+	var g := game.grid
+	var corners := [Vector3.ZERO, Vector3(g.w * g.cell_size, 0, 0),
+		Vector3(0, 0, g.h * g.cell_size), Vector3(g.w * g.cell_size, 0, g.h * g.cell_size)]
+	var basis_inv := cam.global_transform.basis.inverse()
+	var origin := cam.global_transform.origin
+	var ex := 0.0
+	var ey := 0.0
+	for c in corners:
+		var local: Vector3 = basis_inv * (c - origin)
+		ex = max(ex, absf(local.x))
+		ey = max(ey, absf(local.y))
+	var vp := get_viewport().get_visible_rect().size
+	var aspect: float = vp.x / max(vp.y, 1.0)
+	var pad := Cfg.num("camera.fit_padding", 1.18)
+	_ortho_size = clampf(max(ey * 2.0, ex * 2.0 / aspect) * pad,
+		Cfg.num("camera.ortho_min", 10.0), Cfg.num("camera.ortho_max", 90.0))
+	_update_camera()
 
 ## 直接指定俯角（调镜头用）。传正数，内部按俯视处理。
 func set_pitch(deg: float) -> void:

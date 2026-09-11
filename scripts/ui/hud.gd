@@ -16,6 +16,8 @@ var build_bar: HBoxContainer = null
 var btn_wave: Button = null
 var btn_pause: Button = null
 var btn_sandbox: Button = null
+var opt_level: OptionButton = null
+var _level_ids: Array[String] = []
 var speed_buttons: Array[Button] = []
 var trap_buttons: Dictionary = {}
 
@@ -67,6 +69,16 @@ func _build() -> void:
 	row2.add_child(_button("重开 (F2)", func(): main.on_restart()))
 	btn_sandbox = _button("沙盒 (F1)", func(): main.on_sandbox())
 	row2.add_child(btn_sandbox)
+
+	var row_level := HBoxContainer.new()
+	vb.add_child(row_level)
+	var lv_label := Label.new()
+	lv_label.text = "关卡 "
+	row_level.add_child(lv_label)
+	opt_level = OptionButton.new()
+	opt_level.focus_mode = Control.FOCUS_NONE
+	opt_level.item_selected.connect(_on_level_selected)
+	row_level.add_child(opt_level)
 
 	var row3 := HBoxContainer.new()
 	vb.add_child(row3)
@@ -125,6 +137,25 @@ func _build() -> void:
 	root.add_child(lbl_banner)
 
 	rebuild_build_bar()
+	rebuild_level_list()
+
+func rebuild_level_list() -> void:
+	if opt_level == null or game == null:
+		return
+	_level_ids.clear()
+	opt_level.clear()
+	var ids := Cfg.levels.keys()
+	ids.sort()
+	for id in ids:
+		var lv: Dictionary = Cfg.levels[id]
+		_level_ids.append(String(id))
+		opt_level.add_item(String(lv.get("name", id)))
+		if String(id) == game.level_id:
+			opt_level.select(_level_ids.size() - 1)
+
+func _on_level_selected(index: int) -> void:
+	if index >= 0 and index < _level_ids.size() and main != null:
+		main.switch_level(_level_ids[index])
 
 func rebuild_build_bar() -> void:
 	for c in build_bar.get_children():
