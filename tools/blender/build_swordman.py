@@ -189,7 +189,7 @@ def build_sword(arm, hand_z):
     # 剑尖朝上握在手里：刀身沿局部 +Z，稍微往后仰一点，别戳到头盔
     # 绕 Y 转 = 刀身往身体外侧倒，不然升起来会被上臂挡住
     sword = joint("Sword", (0.022, 0.03, hand_z + 0.015), arm,
-                  rotation=(math.radians(-7), math.radians(17), 0))
+                  rotation=(math.radians(-7), math.radians(45), 0))
     box("Grip", (0, 0, -P["grip_len"] / 2), (0.036, 0.036, P["grip_len"]), "armor_dark", sword)
     box("Guard", (0, 0, 0), (P["guard_w"], 0.045, P["guard_h"]), "metal_gold", sword)
     box("Pommel", (0, 0, -P["grip_len"]), (0.05, 0.05, 0.035), "metal_gold", sword)

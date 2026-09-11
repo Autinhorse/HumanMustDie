@@ -231,17 +231,23 @@ Root
 **朝向约定**：模型在 Blender 里朝 **+Y**（面罩在 +Y 面）。glTF 转 Y-up 后 Blender +Y → Godot -Z，
 正好是 Godot 的前方，所以 `enemy.gd` 里用 `atan2(-dx, -dz)` 转向就对。面罩放反了整个人就会倒着跑。
 
-**重新导出后必须跑一次编辑器导入**，否则游戏里用的还是旧模型（非编辑器模式不会重新导入 glb）：
+改模型比例改 `build_swordman.py` 里的 `P`，改配色改 `COLORS`，改完跑一次：
 
 ```
-Godot_v4.7-stable_win64_console.exe --headless --editor --quit --path .
+toolsebuild_models.bat            双击也行；加 --pose 顺便出姿势检查图
+python tools/rebuild_models.py      跨平台的话跑这个
 ```
 
-改模型比例改 `build_swordman.py` 里的 `P`，改配色改 `COLORS`。改完重新导出：
+**只有改模型才要跑**；改代码、改数值、改关卡都不用。
+
+它做的是两步，第二步不能省 —— **非编辑器模式不会重新导入 glb**，少了它游戏里会一直用旧模型：
 
 ```
 blender --background --python tools/blender/build_swordman.py --     --out assets/models/swordman.glb --render renders/swordman.png
+Godot_v4.7-stable_win64_console.exe --headless --editor --quit --path .
 ```
+
+Blender / Godot 装在别处的话，设环境变量 `BLENDER_EXE` / `GODOT_EXE`。
 
 动作调完可以用姿势检查场景一次看全（站立 / 跑步两相 / 被击飞 / 倒地两段）：
 
