@@ -12,7 +12,7 @@
   "camera": {
     "_comment": "斜俯视用正交投影，不做透视；缩放改的是 ortho_size（可视高度，单位=世界米）",
     "projection": "orthogonal",
-    "pitch_deg": -52.0,
+    "pitch_deg": -45.0,
     "yaw_deg": -40.0,
     "distance": 60.0,
     "ortho_size": 46.0,

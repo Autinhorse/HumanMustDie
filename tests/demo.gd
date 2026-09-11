@@ -29,6 +29,7 @@ func _maybe_screenshot() -> void:
 	var path := ""
 	var delay := 6.0
 	var ortho := 0.0
+	var pitch := 0.0
 	for i in args.size():
 		if args[i] == "--shot" and i + 1 < args.size():
 			path = args[i + 1]
@@ -36,11 +37,15 @@ func _maybe_screenshot() -> void:
 			delay = float(args[i + 1])
 		elif args[i] == "--ortho" and i + 1 < args.size():
 			ortho = float(args[i + 1])
+		elif args[i] == "--pitch" and i + 1 < args.size():
+			pitch = float(args[i + 1])
 	if path == "":
 		return
+	var m := get_child(0)
 	if ortho > 0.0:
-		var m := get_child(0)
 		m.set_zoom(ortho)
+	if pitch > 0.0:
+		m.set_pitch(pitch)
 	await get_tree().create_timer(delay).timeout
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()

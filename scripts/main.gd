@@ -421,6 +421,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					select_trap(String(allowed[i]))
 					break
 
+## 直接指定俯角（调镜头用）。传正数，内部按俯视处理。
+func set_pitch(deg: float) -> void:
+	_pitch = -absf(deg)
+	_update_camera()
+
 ## 直接指定正交可视高度（调美术/拍近景用）
 func set_zoom(size: float) -> void:
 	_ortho_size = clampf(size, Cfg.num("camera.ortho_min", 10.0), Cfg.num("camera.ortho_max", 90.0))
