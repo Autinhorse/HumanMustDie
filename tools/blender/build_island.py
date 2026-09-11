@@ -1,6 +1,7 @@
 """
 读游戏自己的关卡数据，在 Blender 里搭出"空中悬浮岛"风格的场景并渲染。
-参考风格：Isle of Arrows —— 奶白顶面 + 灰岩侧面 + 下挂深色岩体 + 青灰雾气 + 正交高角 + 柔和阴影。
+参考风格：Isle of Arrows —— 地面是一整块平面（只靠细缝分格）、灰岩侧面、下挂深色岩体、
+青灰雾气、正交高角、柔和阴影。地面不能做成一格一个凸块。
 
 用法（无头）：
   blender --background --python tools/blender/build_island.py -- \

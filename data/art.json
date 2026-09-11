@@ -3,20 +3,21 @@
 
   "palette": {
     "_comment": "地面顶面三档色差，避免大片死白；侧面统一灰岩",
-    "floor_top":   ["#DED6C4", "#CBC2AD", "#B4AB98"],
-    "floor_top_weights": [0.62, 0.26, 0.12],
+    "floor_top":   ["#DED6C4", "#D6CDB9", "#C6BCA7"],
+    "floor_top_weights": [0.78, 0.15, 0.07],
     "floor_side":  "#8D8477",
-    "bridge_top":  "#D8C6A4",
+    "bridge_top":  "#C6AC80",
     "bridge_side": "#8D8477",
-    "wall_top":    "#E8E3D6",
-    "wall_side":   "#BDB4A2",
+    "wall_top":    "#F2EFE6",
+    "wall_side":   "#A79D8A",
     "obstacle_top":  "#8A8079",
     "obstacle_side": "#6E645D",
     "rock_top":    "#8C7E72",
     "rock_deep":   "#6B5C52",
     "core_rim":    "#EDE7DA",
+    "grid_line":   "#BDB3A0",
     "core_water":  "#3FB3B0",
-    "entrance":    "#E2674A",
+    "entrance":    "#D4825F",
     "cloud":       "#EAF1F0"
   },
 
@@ -78,10 +79,10 @@
   },
 
   "board": {
-    "_comment": "顶盖是薄薄一层，露出下面的侧面色，参考图里就是这种两段式",
-    "cap_thickness": 0.06,
-    "cell_gap": 0.06,
-    "wall_cell_gap": 0.03,
-    "bridge_inset": 0.06
+    "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝",
+    "grid_line_width": 0.07,
+    "tile_lift": 0.002,
+    "obstacle_height_mul": 1.35,
+    "bridge_thickness_mul": 0.6
   }
 }
