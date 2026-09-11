@@ -36,6 +36,8 @@ var recent_sources: Dictionary = {}     # source -> 最后一次接触时间，�
 var dead_cause: String = ""
 var dead_source: String = ""
 
+var actor: ActorView = null
+var run_phase: float = 0.0
 var _landed: bool = false
 var _mesh: MeshInstance3D = null
 var _mat: StandardMaterial3D = null
@@ -62,6 +64,14 @@ func setup(p_type: String, p_data: Dictionary, p_game) -> void:
 	_build_view()
 
 func _build_view() -> void:
+	var model_id := String(data.get("model", ""))
+	if model_id != "":
+		var a := ActorView.new()
+		add_child(a)
+		if a.setup(model_id, height, _base_color):
+			actor = a
+			return
+		a.queue_free()
 	_mesh = MeshInstance3D.new()
 	var capsule := CapsuleMesh.new()
 	capsule.radius = radius
@@ -144,6 +154,7 @@ func step(dt: float) -> void:
 	if game.sim_time > slow_until and slow_factor < 1.0:
 		slow_factor = 1.0
 		_refresh_tint()
+	var prev_pos := position
 	match state:
 		State.GROUND:
 			_step_ground(dt)
@@ -151,6 +162,24 @@ func step(dt: float) -> void:
 			_step_thrown(dt)
 		State.FALLING:
 			_step_falling(dt)
+	_animate(prev_pos, dt)
+
+## 动作由移动距离驱动，倍速播放时步频自然跟着变
+func _animate(prev_pos: Vector3, dt: float) -> void:
+	if actor == null:
+		return
+	var delta := position - prev_pos
+	delta.y = 0.0
+	var dist := delta.length()
+	if dist > 0.0005:
+		actor.rotation.y = atan2(-delta.x, -delta.z)
+	if state == State.GROUND:
+		var stride: float = max(height * 0.55, 0.2)
+		run_phase += dist / stride * PI
+		var intensity: float = clampf(dist / max(speed * dt, 0.0001), 0.0, 1.0)
+		actor.set_run(run_phase, intensity)
+	else:
+		actor.set_tumble(game.sim_time)
 
 func _step_ground(dt: float) -> void:
 	var cell := grid.world_to_cell(position)
@@ -237,6 +266,9 @@ func _step_falling(dt: float) -> void:
 # ---------------------------------------------------------------- 表现
 
 func _refresh_tint() -> void:
+	if actor != null:
+		actor.set_state_tint(hp / max_hp, slow_factor < 1.0)
+		return
 	if _mat == null:
 		return
 	var ratio := clampf(hp / max_hp, 0.0, 1.0)

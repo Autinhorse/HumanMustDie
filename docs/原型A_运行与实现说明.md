@@ -200,6 +200,46 @@ python tools/map_from_image.py --image ref/DungeonWarfareMap01.png     --out dat
 转完会打印**连通性检查**：有多少可行走格、有几格走不到核心、地图边缘有哪些开口。
 我们的引擎是按「边缘上离核心最远的连通开口」自动定入口的，所以边缘只留一处开口最省事。
 
+## 6.7 敌人模型与程序化动作（v0.0.9 起）
+
+参考 `ref/swordman.png`，`tools/blender/build_swordman.py` 在 Blender 里用盒子搭出剑士
+并导出 `assets/models/swordman.glb`。**不做骨骼**：每个部件的原点放在关节上
+（颈 / 肩 / 髋 / 握把），Godot 里直接给节点转角度就能做动作。
+
+```
+Root
+ ├ Torso          原点在髋部
+ │   ├ Head       原点在颈部
+ │   ├ ArmL / ArmR  原点在肩
+ │   └ ArmR > Sword 原点在握把
+ └ LegL / LegR    原点在髋
+```
+
+`scripts/view/actor_view.gd` 负责动作：
+
+- **跑步**由**走过的距离**驱动（不是时间），所以倍速播放时步频自然跟着变，
+  减速时也会自动变慢；腿和手臂反相摆动，躯干前倾、身体上下起伏。
+- **被击飞**时缩成一团，比僵直地保持跑步姿势可读。
+- **倒地**：先把剑从手上解绑扔出去（自带抛物线和旋转，落地停住），
+  身体绕脚跟仰面转 90°，四肢摊平。
+- 敌人主色（模型里的 `armor_primary` 材质）按 `enemies.json` 的 `color` 换，
+  其余配色沿用模型自带的；受伤变暗、减速泛蓝的逻辑和原来的胶囊一致。
+
+尸体不再参与模拟（不挡路、不吃伤害），播完倒地动画后按 `combat.corpse_life` 清掉；
+掉下地图和抵达核心的不留尸体。
+
+改模型比例改 `build_swordman.py` 里的 `P`，改配色改 `COLORS`。改完重新导出：
+
+```
+blender --background --python tools/blender/build_swordman.py --     --out assets/models/swordman.glb --render renders/swordman.png
+```
+
+动作调完可以用姿势检查场景一次看全（站立 / 跑步两相 / 被击飞 / 倒地两段）：
+
+```
+Godot_v4.7-stable_win64.exe --path . res://tests/pose.tscn -- --shot D:/poses.png
+```
+
 ## 7. 已知问题 / 下一步
 
 1. **坠落击杀占比偏高**（示例 57%），正好压在文档 §19 风险二的警戒线上。深坑容量、堵塞、重型豁免都还没实现，建议下一步先加"坑有吞吐上限"再谈平衡。

@@ -57,6 +57,7 @@ var _acc := 0.0
 var _step := 1.0 / 60.0
 var _max_steps := 40
 
+var _corpses: Array = []
 var _enemy_root: Node3D = null
 var _trap_root: Node3D = null
 
@@ -73,6 +74,7 @@ func reset() -> void:
 		remove_child(c)
 		c.queue_free()
 	enemies.clear()
+	_corpses.clear()
 	traps.clear()
 	_trap_index.clear()
 	_enemy_by_cell.clear()
@@ -172,6 +174,7 @@ func _step_sim(dt: float) -> void:
 		e.step(dt)
 	_resolve_contacts(dt)
 	_cleanup()
+	_step_corpses(dt)
 	if _spawn_queue.is_empty() and enemies.is_empty() and phase == Phase.COMBAT:
 		_finish_wave()
 
@@ -235,6 +238,27 @@ func _resolve_contacts(_dt: float) -> void:
 				if b.state == Enemy.State.GROUND:
 					b.position += push_dir * overlap
 
+## 尸体不再参与模拟，只把倒地动画放完
+func _step_corpses(dt: float) -> void:
+	if _corpses.is_empty():
+		return
+	var anim := Cfg.num("combat.death_anim_time", 0.55)
+	var life := Cfg.num("combat.corpse_life", 3.0)
+	var keep: Array = []
+	for c in _corpses:
+		var e = c["node"]
+		if not is_instance_valid(e):
+			continue
+		c["t"] = float(c["t"]) + dt
+		var t: float = c["t"]
+		e.actor.set_death(clampf(t / anim, 0.0, 1.0))
+		e.actor.step_sword(dt, c_gravity)
+		if t < life:
+			keep.append(c)
+		else:
+			e.queue_free()
+	_corpses = keep
+
 func _cleanup() -> void:
 	var alive: Array = []
 	for e in enemies:
@@ -242,7 +266,11 @@ func _cleanup() -> void:
 			alive.append(e)
 			continue
 		_on_enemy_died(e)
-		e.queue_free()
+		# 掉下地图和抵达核心的不留尸体；其余播完倒地动画再清掉
+		if e.actor != null and e.dead_cause != "fall" and e.dead_cause != "core":
+			_corpses.append({"node": e, "t": 0.0})
+		else:
+			e.queue_free()
 	enemies = alive
 
 func _on_enemy_died(e) -> void:

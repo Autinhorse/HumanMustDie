@@ -11,6 +11,7 @@
     "impact_decay": 1.0,
     "gold": 5,
     "core_damage": 1,
+    "model": "swordman",
     "radius": 0.42,
     "height": 1.1,
     "color": [0.886, 0.290, 0.482]
@@ -26,6 +27,7 @@
     "impact_decay": 1.0,
     "gold": 11,
     "core_damage": 2,
+    "model": "swordman",
     "radius": 0.5,
     "height": 1.45,
     "color": [0.941, 0.569, 0.235]
@@ -41,6 +43,7 @@
     "impact_decay": 1.0,
     "gold": 28,
     "core_damage": 5,
+    "model": "swordman",
     "radius": 0.78,
     "height": 2.1,
     "color": [0.306, 0.549, 0.388]

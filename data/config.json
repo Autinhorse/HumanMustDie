@@ -49,6 +49,8 @@
     "landing_speed_threshold": 7.0,
     "landing_damage_coef": 1.2,
     "combo_window": 2.0,
+    "death_anim_time": 0.55,
+    "corpse_life": 3.0,
     "enemy_separation": 0.55
   },
 
