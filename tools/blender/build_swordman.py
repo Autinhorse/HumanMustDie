@@ -55,7 +55,8 @@ P = {
 
 COLORS = {
     "armor_primary": (0.106, 0.278, 0.671),   # 蓝 主色，Godot 里会按敌人类型换
-    "armor_dark":    (0.098, 0.176, 0.392),   # 深蓝 腿/护手
+    "armor_dark":    (0.098, 0.176, 0.392),   # 深蓝，固定不换色
+    "armor_shade":   (0.075, 0.137, 0.318),   # 腿/护手：跟着敌人主色走，但暗一档
     "cloth_red":     (0.686, 0.106, 0.125),   # 红 上臂
     "metal_gold":    (0.949, 0.733, 0.157),   # 金 腰带/头盔边/靴/护手
     "metal_blade":   (0.878, 0.894, 0.906),   # 剑刃
@@ -214,7 +215,7 @@ def build(variant="swordman"):
         box("Upper%s" % side, (0, 0, -P["upper_arm"] / 2),
             (P["arm_w"], P["arm_d"], P["upper_arm"]), upper_mat, arm)
         box("Fore%s" % side, (0, 0, -P["upper_arm"] - P["fore_arm"] / 2),
-            (P["arm_w"] * 1.03, P["arm_d"] * 1.03, P["fore_arm"]), "armor_dark", arm)
+            (P["arm_w"] * 1.03, P["arm_d"] * 1.03, P["fore_arm"]), "armor_shade", arm)
         if side == "R":
             build_sword(arm, -P["upper_arm"] - P["fore_arm"])
         elif variant == "shieldman":
@@ -225,7 +226,7 @@ def build(variant="swordman"):
     for side, sx in (("L", -1.0), ("R", 1.0)):
         leg = joint("Leg%s" % side, (sx * leg_x, 0, leg_top), root)
         box("Shin%s" % side, (0, 0, -(P["leg_h"] - P["boot_h"]) / 2),
-            (P["leg_w"], P["leg_d"], P["leg_h"] - P["boot_h"]), "armor_dark", leg)
+            (P["leg_w"], P["leg_d"], P["leg_h"] - P["boot_h"]), "armor_shade", leg)
         box("Boot%s" % side, (0, -0.012, -P["leg_h"] + P["boot_h"] / 2),
             (P["leg_w"] + P["boot_over"], P["leg_d"] + P["boot_over"] * 2.4, P["boot_h"]),
             "metal_gold", leg, top_scale=0.92)
@@ -263,7 +264,7 @@ def build_sword(arm, hand_z):
     # 绕 X 负角 = 刀身往前倾（角色朝 +Y）；绕 Y 小角 = 往身体外侧让开上臂
     sword = joint("Sword", (0.050, 0.03, hand_z + 0.02), arm,
                   rotation=(math.radians(-30), math.radians(8), 0))
-    box("Grip", (0, 0, -P["grip_len"] / 2), (0.036, 0.036, P["grip_len"]), "armor_dark", sword)
+    box("Grip", (0, 0, -P["grip_len"] / 2), (0.036, 0.036, P["grip_len"]), "armor_shade", sword)
     box("Guard", (0, 0, 0), (P["guard_w"], 0.045, P["guard_h"]), "metal_gold", sword)
     box("Pommel", (0, 0, -P["grip_len"]), (0.05, 0.05, 0.035), "metal_gold", sword)
     box("Blade", (0, 0, P["blade_len"] / 2), (P["blade_w"], P["blade_d"], P["blade_len"]),

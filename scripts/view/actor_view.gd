@@ -15,6 +15,7 @@ var model_id := ""
 var ok := false
 
 var _tint_mats: Array[StandardMaterial3D] = []
+var _shade_mats: Array[StandardMaterial3D] = []
 var _base_color := Color.WHITE
 var _leg_swing := 57.0
 var _arm_swing := 60.0
@@ -23,6 +24,7 @@ var _torso_lean := 14.0
 var _head_lean := 4.0
 var _bob := 0.06
 var _locked_arms: Array = []
+var _shade_darken := 0.42
 var _sword_free := false
 var _sword_vel := Vector3.ZERO
 var _sword_spin := Vector3.ZERO
@@ -60,6 +62,7 @@ func _load_anim_params() -> void:
 	for k in per.keys():
 		a[k] = per[k]
 	_locked_arms = a.get("lock_arms", [])
+	_shade_darken = float(a.get("shade_darken", _shade_darken))
 	_leg_swing = float(a.get("leg_swing_deg", _leg_swing))
 	_arm_swing = float(a.get("arm_swing_deg", _arm_swing))
 	_sword_arm_ratio = float(a.get("sword_arm_ratio", _sword_arm_ratio))
@@ -83,10 +86,17 @@ func _collect_tint_materials(node: Node) -> void:
 		if mesh != null:
 			for i in mesh.get_surface_count():
 				var m := mesh.surface_get_material(i)
-				if m != null and String(m.resource_name).begins_with("armor_primary"):
+				if m == null:
+					continue
+				var mname := String(m.resource_name)
+				if mname.begins_with("armor_primary") or mname.begins_with("armor_shade"):
 					var dup: StandardMaterial3D = m.duplicate()
 					node.set_surface_override_material(i, dup)
-					_tint_mats.append(dup)
+					# armor_shade 是腿和护手，跟着主色但暗一档
+					if mname.begins_with("armor_shade"):
+						_shade_mats.append(dup)
+					else:
+						_tint_mats.append(dup)
 	for c in node.get_children():
 		_collect_tint_materials(c)
 
@@ -97,6 +107,9 @@ func set_color(c: Color) -> void:
 func _apply_tint(c: Color) -> void:
 	for m in _tint_mats:
 		m.albedo_color = c
+	var dark: Color = c.darkened(_shade_darken)
+	for m in _shade_mats:
+		m.albedo_color = dark
 
 ## 受伤变暗、减速泛蓝，和原来的胶囊表现一致
 func set_state_tint(hp_ratio: float, slowed: bool) -> void:

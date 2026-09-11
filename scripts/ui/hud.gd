@@ -21,6 +21,8 @@ var _level_ids: Array[String] = []
 var speed_buttons: Array[Button] = []
 var trap_buttons: Dictionary = {}
 
+const LOG_WIDTH := 300.0
+
 var _log_lines: PackedStringArray = PackedStringArray()
 var _inspect_text: String = ""
 
@@ -46,7 +48,9 @@ func _build() -> void:
 	# 左上：状态
 	var info := _panel(Vector2(12, 12), Control.PRESET_TOP_LEFT)
 	lbl_status = Label.new()
-	lbl_status.custom_minimum_size = Vector2(360, 0)
+	lbl_status.custom_minimum_size = Vector2(330, 0)
+	lbl_status.clip_text = true
+	lbl_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.add_child(lbl_status)
 
 	# 右上：控制
@@ -96,6 +100,7 @@ func _build() -> void:
 	root.add_child(bottom)
 
 	lbl_hint = Label.new()
+	lbl_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bottom.add_child(lbl_hint)
 
@@ -113,7 +118,9 @@ func _build() -> void:
 	# 左下：日志
 	var log_panel := _panel(Vector2(12, -12), Control.PRESET_BOTTOM_LEFT)
 	lbl_log = Label.new()
-	lbl_log.custom_minimum_size = Vector2(430, 150)
+	lbl_log.custom_minimum_size = Vector2(LOG_WIDTH, 150)
+	lbl_log.clip_text = true          # 长行截断，不让面板被撑宽
+	lbl_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl_log.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_panel.add_child(lbl_log)
 
@@ -121,6 +128,7 @@ func _build() -> void:
 	stats_panel = _panel(Vector2(-12, 200), Control.PRESET_TOP_RIGHT)
 	lbl_stats = Label.new()
 	lbl_stats.custom_minimum_size = Vector2(420, 0)
+	lbl_stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl_stats.add_theme_font_override("font", _mono_font())
 	lbl_stats.add_theme_font_size_override("font_size", 13)
 	stats_panel.add_child(lbl_stats)
@@ -178,6 +186,8 @@ func _panel(offset: Vector2, preset: int) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.set_anchors_preset(preset)
 	p.position = offset
+	# 信息面板只是显示，不能吃掉点击 —— 否则窗口一窄就会盖住机关按钮按不动
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	match preset:
 		Control.PRESET_TOP_RIGHT:
 			p.grow_horizontal = Control.GROW_DIRECTION_BEGIN

@@ -52,7 +52,7 @@
   },
 
   "anim": {
-    "_comment": "跑步动作。相位由走过的距离驱动，所以 stride_ratio 越大步子越大、一个循环耗时越久；其余是各部件的摆动/前倾角度。",
+    "_comment": "跑步动作与配色。shade_darken 是腿/护手相对主色暗多少。相位由走过的距离驱动，所以 stride_ratio 越大步子越大、一个循环耗时越久；其余是各部件的摆动/前倾角度。",
     "leg_swing_deg": 57.0,
     "arm_swing_deg": 60.0,
     "sword_arm_ratio": 0.55,
@@ -60,6 +60,7 @@
     "head_lean_deg": 4.0,
     "bob_height": 0.06,
     "stride_ratio": 0.715,
+    "shade_darken": 0.42,
 
     "per_model": {
       "_comment": "按模型覆盖上面的动作参数。lock_arms 里的手臂保持模型自带的静止姿势，不参与摆动。",
