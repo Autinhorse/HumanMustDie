@@ -13,6 +13,7 @@ var _dist := 60.0
 var _pitch := -52.0
 var _ortho_size := 46.0
 var _backdrop: MeshInstance3D = null
+var _clouds: Array[MeshInstance3D] = []
 
 var pending_trap_id: String = ""
 var pending_facing := Vector2i(0, -1)
@@ -117,6 +118,64 @@ func _build_backdrop(env_cfg: Dictionary) -> void:
 	_backdrop.material_override = mat
 	_backdrop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	cam.add_child(_backdrop)
+	_build_clouds()
+
+## 云：参考图里是画在背景上的柔边薄雾，不是有体积的白球。
+## 做成跟随相机的一层宽扁柔边片，和天空只差一点亮度，永远在所有东西后面。
+func _build_clouds() -> void:
+	_clouds.clear()
+	var cfg: Dictionary = Cfg.art.get("clouds", {})
+	if not bool(cfg.get("enabled", true)):
+		return
+	var pal: Dictionary = Cfg.art.get("palette", {})
+
+	var grad := Gradient.new()
+	var core_col: Color = _pal_color(pal, "cloud", Color(0.92, 0.96, 0.95))
+	grad.set_color(0, Color(core_col.r, core_col.g, core_col.b, 1.0))
+	grad.set_color(1, Color(core_col.r, core_col.g, core_col.b, 0.0))
+	# 中间加一个点控制虚化程度：越靠外越软
+	grad.add_point(float(cfg.get("softness", 0.45)), Color(core_col.r, core_col.g, core_col.b, 0.72))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 256
+	tex.height = 256
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.albedo_color = Color(1, 1, 1, float(cfg.get("alpha", 0.5)))
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(Cfg.art.get("rock", {}).get("seed", 20260911)) + 31
+	var aspect_min := float(cfg.get("aspect_min", 2.4))
+	var aspect_max := float(cfg.get("aspect_max", 4.5))
+	for i in int(cfg.get("count", 9)):
+		var mi := MeshInstance3D.new()
+		mi.mesh = QuadMesh.new()
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# 归一化的屏幕位置，偏向画面边缘；缩放时在 _update_camera 里跟着走
+		var nx: float = rng.randf_range(-1.15, 1.15)
+		var ny: float = rng.randf_range(-1.1, 1.1)
+		if absf(nx) < 0.55 and absf(ny) < 0.5:
+			ny = (1.0 if ny >= 0.0 else -1.0) * rng.randf_range(0.55, 1.1)
+		mi.set_meta("nx", nx)
+		mi.set_meta("ny", ny)
+		mi.set_meta("nw", rng.randf_range(float(cfg.get("width_min", 0.5)), float(cfg.get("width_max", 1.1))))
+		mi.set_meta("aspect", rng.randf_range(aspect_min, aspect_max))
+		cam.add_child(mi)
+		_clouds.append(mi)
+
+func _pal_color(pal: Dictionary, key: String, def: Color) -> Color:
+	if pal.has(key) and typeof(pal[key]) == TYPE_STRING:
+		return Color(String(pal[key]))
+	return def
 
 func _make_environment(env_cfg: Dictionary) -> Environment:
 	var e := Environment.new()
@@ -180,6 +239,13 @@ func _update_camera() -> void:
 		var aspect: float = vp.x / max(vp.y, 1.0)
 		_backdrop.mesh.size = Vector2(_ortho_size * aspect * 1.05, _ortho_size * 1.05)
 		_backdrop.position = Vector3(0, 0, -cam.far * 0.9)
+		var half_w: float = _ortho_size * aspect * 0.5
+		var half_h: float = _ortho_size * 0.5
+		for c in _clouds:
+			var w: float = float(c.get_meta("nw")) * _ortho_size
+			c.mesh.size = Vector2(w, w / float(c.get_meta("aspect")))
+			c.position = Vector3(float(c.get_meta("nx")) * half_w,
+				float(c.get_meta("ny")) * half_h, -cam.far * 0.86)
 
 # ---------------------------------------------------------------- 每帧
 

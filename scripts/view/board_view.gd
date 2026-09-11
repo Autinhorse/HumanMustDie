@@ -10,7 +10,6 @@ var grid: HGrid = null
 
 var _board: MeshInstance3D = null
 var _water: MeshInstance3D = null
-var _clouds: Node3D = null
 
 # 本次构建缓存的尺寸与配色
 var _cs := 2.0
@@ -111,7 +110,6 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 	add_child(_board)
 
 	_build_core(pal)
-	_build_clouds(art)
 
 # ---------------------------------------------------------------- 构件
 
@@ -255,69 +253,6 @@ func _build_core(pal: Dictionary) -> void:
 	water_mat.emission_energy_multiplier = 0.45
 	_water.material_override = water_mat
 	add_child(_water)
-
-func _build_clouds(art: Dictionary) -> void:
-	var cfg: Dictionary = art.get("clouds", {})
-	if not bool(cfg.get("enabled", true)):
-		return
-	_clouds = Node3D.new()
-	_clouds.name = "Clouds"
-	add_child(_clouds)
-
-	var pal: Dictionary = art.get("palette", {})
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(art.get("rock", {}).get("seed", 20260911)) + 7
-
-	# 竖直渐变：顶亮底暗，云才有体积感；平涂不接岛的投影
-	var grad := Gradient.new()
-	grad.set_color(0, _col(pal, "cloud_top", Color(1.0, 1.0, 1.0)))
-	grad.set_color(1, _col(pal, "cloud_bottom", Color(0.76, 0.84, 0.85)))
-	var tex := GradientTexture2D.new()
-	tex.gradient = grad
-	tex.width = 8
-	tex.height = 256
-	tex.fill_from = Vector2(0, 0)
-	tex.fill_to = Vector2(0, 1)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = tex
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
-
-	var center := grid.center_world()
-	var island_radius: float = max(center.x, center.z)
-	var ring_min := float(cfg.get("ring_min", 1.35)) * island_radius
-	var ring_max := float(cfg.get("ring_max", 2.6)) * island_radius
-	var flatten := float(cfg.get("flatten", 0.45))
-	var lumps := int(cfg.get("lumps", 4))
-	for i in int(cfg.get("count", 10)):
-		var group := Node3D.new()
-		var ang := rng.randf() * TAU
-		var dist := rng.randf_range(ring_min, ring_max)
-		group.position = Vector3(
-			center.x + cos(ang) * dist,
-			rng.randf_range(float(cfg.get("y_min", -70.0)), float(cfg.get("y_max", -42.0))),
-			center.z + sin(ang) * dist)
-		_clouds.add_child(group)
-
-		var base := rng.randf_range(float(cfg.get("radius_min", 7.0)), float(cfg.get("radius_max", 14.0)))
-		for j in lumps:
-			var mi := MeshInstance3D.new()
-			var sphere := SphereMesh.new()
-			var r: float = base * (1.0 if j == 0 else rng.randf_range(0.45, 0.8))
-			sphere.radius = r
-			sphere.height = r * 2.0
-			sphere.radial_segments = 24
-			sphere.rings = 12
-			mi.mesh = sphere
-			mi.material_override = mat
-			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			if j == 0:
-				mi.position = Vector3.ZERO
-			else:
-				mi.position = Vector3(rng.randf_range(-base, base), rng.randf_range(-base * 0.15, base * 0.25),
-					rng.randf_range(-base * 0.5, base * 0.5))
-			mi.scale = Vector3(1.0, flatten, 1.0)
-			group.add_child(mi)
 
 # ---------------------------------------------------------------- 杂项
 

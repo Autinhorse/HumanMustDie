@@ -18,7 +18,7 @@
     "grid_line":   "#BDB3A0",
     "core_water":  "#3FB3B0",
     "entrance":    "#D4825F",
-    "cloud":       "#EAF1F0",
+    "cloud":       "#E4EFEE",
     "cloud_top":   "#FFFFFF",
     "cloud_bottom": "#B9CFD1"
   },
@@ -40,16 +40,15 @@
   },
 
   "clouds": {
+    "_comment": "背景柔边薄雾。alpha 越低越接近天空；softness 越小边缘越虚；width 是相对画面高度的比例",
     "enabled": true,
-    "count": 12,
-    "radius_min": 4.0,
-    "radius_max": 8.0,
-    "flatten": 0.40,
-    "lumps": 3,
-    "y_min": -95.0,
-    "y_max": -60.0,
-    "ring_min": 1.6,
-    "ring_max": 3.4
+    "count": 11,
+    "alpha": 0.55,
+    "softness": 0.42,
+    "width_min": 0.55,
+    "width_max": 1.45,
+    "aspect_min": 2.4,
+    "aspect_max": 4.5
   },
 
   "environment": {
