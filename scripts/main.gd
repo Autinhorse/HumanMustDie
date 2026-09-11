@@ -355,6 +355,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					select_trap(String(allowed[i]))
 					break
 
+## 直接指定正交可视高度（调美术/拍近景用）
+func set_zoom(size: float) -> void:
+	_ortho_size = clampf(size, Cfg.num("camera.ortho_min", 10.0), Cfg.num("camera.ortho_max", 90.0))
+	_update_camera()
+
 func _zoom(sign_dir: int) -> void:
 	_ortho_size = clampf(_ortho_size + float(sign_dir) * Cfg.num("camera.zoom_step", 3.0),
 		Cfg.num("camera.ortho_min", 12.0), Cfg.num("camera.ortho_max", 90.0))

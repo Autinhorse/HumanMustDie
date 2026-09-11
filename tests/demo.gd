@@ -28,13 +28,19 @@ func _maybe_screenshot() -> void:
 	var args := OS.get_cmdline_user_args()
 	var path := ""
 	var delay := 6.0
+	var ortho := 0.0
 	for i in args.size():
 		if args[i] == "--shot" and i + 1 < args.size():
 			path = args[i + 1]
 		elif args[i] == "--shot-delay" and i + 1 < args.size():
 			delay = float(args[i + 1])
+		elif args[i] == "--ortho" and i + 1 < args.size():
+			ortho = float(args[i + 1])
 	if path == "":
 		return
+	if ortho > 0.0:
+		var m := get_child(0)
+		m.set_zoom(ortho)
 	await get_tree().create_timer(delay).timeout
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()

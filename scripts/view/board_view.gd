@@ -157,43 +157,55 @@ func _side_quad(st: SurfaceTool, center: Vector3, dir: Vector2i, y_top: float, y
 	var n := Vector3(float(dir.x), 0.0, float(dir.y))
 	var side := Vector3(-n.z, 0.0, n.x)
 	var edge := center + n * h
+	# 绕序从底边起，法线才朝外；反了的话整面会被当成背光面渲染成黑的
 	_quad(st,
-		edge - side * h + Vector3(0, y_top, 0),
-		edge + side * h + Vector3(0, y_top, 0),
+		edge - side * h + Vector3(0, y_bottom, 0),
 		edge + side * h + Vector3(0, y_bottom, 0),
-		edge - side * h + Vector3(0, y_bottom, 0), color)
+		edge + side * h + Vector3(0, y_top, 0),
+		edge - side * h + Vector3(0, y_top, 0), color)
 
 func _rock_column(st: SurfaceTool, center: Vector3, top_y: float, rock_cfg: Dictionary,
 		rng: RandomNumberGenerator, top_color: Color, deep_color: Color) -> void:
+	# 1) 实心岩层：四面齐平不收缩，岛才有厚度，不然地表就是一层薄片挂着牙齿
+	var solid := float(rock_cfg.get("solid_depth", 1.6))
+	var solid_bottom := top_y - solid
+	for d in HGrid.DIRS:
+		_side_quad(st, center, d, top_y, solid_bottom, top_color)
+
+	# 2) 实心层下面才是长短不一、带锥度的石柱。宽度和有无都随机，避免整圈像锯齿。
+	if rng.randf() < float(rock_cfg.get("skip_chance", 0.22)):
+		return
 	var depth: float
 	if rng.randf() < float(rock_cfg.get("edge_long_chance", 0.55)):
-		depth = rng.randf_range(float(rock_cfg.get("edge_depth_min", 2.2)),
-			float(rock_cfg.get("edge_depth_max", 7.0)))
+		depth = rng.randf_range(float(rock_cfg.get("edge_depth_min", 1.5)),
+			float(rock_cfg.get("edge_depth_max", 5.5)))
 	else:
-		depth = rng.randf_range(float(rock_cfg.get("inner_depth_min", 1.2)),
-			float(rock_cfg.get("inner_depth_max", 2.6)))
+		depth = rng.randf_range(float(rock_cfg.get("inner_depth_min", 0.6)),
+			float(rock_cfg.get("inner_depth_max", 1.8)))
 	var taper := float(rock_cfg.get("taper", 0.45))
 	var variance := float(rock_cfg.get("taper_variance", 0.5))
 	var jitter := float(rock_cfg.get("jitter", 0.55))
 	var scale: float = clampf(taper * rng.randf_range(1.0 - variance, 1.0 + variance), 0.15, 0.95)
 	var off := Vector3(rng.randf_range(-jitter, jitter), 0.0, rng.randf_range(-jitter, jitter))
 
-	var h := _cs * 0.5
-	var bh := h * scale
-	var y1 := top_y - depth
-	var t0 := center + Vector3(-h, top_y, -h)
-	var t1 := center + Vector3(h, top_y, -h)
-	var t2 := center + Vector3(h, top_y, h)
-	var t3 := center + Vector3(-h, top_y, h)
-	var b0 := center + off + Vector3(-bh, y1, -bh)
-	var b1 := center + off + Vector3(bh, y1, -bh)
-	var b2 := center + off + Vector3(bh, y1, bh)
-	var b3 := center + off + Vector3(-bh, y1, bh)
+	var top_scale := rng.randf_range(float(rock_cfg.get("top_scale_min", 0.62)), 1.0)
+	var h := _cs * 0.5 * top_scale
+	var top_off := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)) * (_cs * 0.5 - h)
+	var bh := _cs * 0.5 * scale * top_scale
+	var y1 := solid_bottom - depth
+	var t0 := center + top_off + Vector3(-h, solid_bottom, -h)
+	var t1 := center + top_off + Vector3(h, solid_bottom, -h)
+	var t2 := center + top_off + Vector3(h, solid_bottom, h)
+	var t3 := center + top_off + Vector3(-h, solid_bottom, h)
+	var b0 := center + top_off + off + Vector3(-bh, y1, -bh)
+	var b1 := center + top_off + off + Vector3(bh, y1, -bh)
+	var b2 := center + top_off + off + Vector3(bh, y1, bh)
+	var b3 := center + top_off + off + Vector3(-bh, y1, bh)
 	_quad(st, b3, b2, b1, b0, deep_color)
-	_quad(st, b0, b1, t1, t0, top_color)
-	_quad(st, b1, b2, t2, t1, top_color)
-	_quad(st, b2, b3, t3, t2, top_color)
-	_quad(st, b3, b0, t0, t3, top_color)
+	_quad(st, b0, b1, t1, t0, deep_color)
+	_quad(st, b1, b2, t2, t1, deep_color)
+	_quad(st, b2, b3, t3, t2, deep_color)
+	_quad(st, b3, b0, t0, t3, deep_color)
 
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color) -> void:
 	for v in [a, b, c, a, c, d]:
@@ -252,37 +264,60 @@ func _build_clouds(art: Dictionary) -> void:
 	_clouds.name = "Clouds"
 	add_child(_clouds)
 
+	var pal: Dictionary = art.get("palette", {})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(art.get("rock", {}).get("seed", 20260911)) + 7
+
+	# 竖直渐变：顶亮底暗，云才有体积感；平涂不接岛的投影
+	var grad := Gradient.new()
+	grad.set_color(0, _col(pal, "cloud_top", Color(1.0, 1.0, 1.0)))
+	grad.set_color(1, _col(pal, "cloud_bottom", Color(0.76, 0.84, 0.85)))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 8
+	tex.height = 256
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(0, 1)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = _col(art.get("palette", {}), "cloud", Color(0.92, 0.95, 0.94))
-	mat.roughness = 1.0
-	mat.metallic_specular = 0.0
-	# 平涂：云只是背景衬托，不该接岛的投影
+	mat.albedo_texture = tex
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 
 	var center := grid.center_world()
 	var island_radius: float = max(center.x, center.z)
 	var ring_min := float(cfg.get("ring_min", 1.35)) * island_radius
 	var ring_max := float(cfg.get("ring_max", 2.6)) * island_radius
-	for i in int(cfg.get("count", 14)):
-		var mi := MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		sphere.radius = rng.randf_range(float(cfg.get("radius_min", 3.0)), float(cfg.get("radius_max", 6.5)))
-		sphere.height = sphere.radius * 2.0
-		sphere.radial_segments = 12
-		sphere.rings = 6
-		mi.mesh = sphere
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var flatten := float(cfg.get("flatten", 0.45))
+	var lumps := int(cfg.get("lumps", 4))
+	for i in int(cfg.get("count", 10)):
+		var group := Node3D.new()
 		var ang := rng.randf() * TAU
 		var dist := rng.randf_range(ring_min, ring_max)
-		mi.position = Vector3(
+		group.position = Vector3(
 			center.x + cos(ang) * dist,
 			rng.randf_range(float(cfg.get("y_min", -70.0)), float(cfg.get("y_max", -42.0))),
 			center.z + sin(ang) * dist)
-		mi.scale = Vector3(rng.randf_range(0.8, 1.3), float(cfg.get("flatten", 0.18)), rng.randf_range(0.8, 1.3))
-		_clouds.add_child(mi)
+		_clouds.add_child(group)
+
+		var base := rng.randf_range(float(cfg.get("radius_min", 7.0)), float(cfg.get("radius_max", 14.0)))
+		for j in lumps:
+			var mi := MeshInstance3D.new()
+			var sphere := SphereMesh.new()
+			var r: float = base * (1.0 if j == 0 else rng.randf_range(0.45, 0.8))
+			sphere.radius = r
+			sphere.height = r * 2.0
+			sphere.radial_segments = 24
+			sphere.rings = 12
+			mi.mesh = sphere
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if j == 0:
+				mi.position = Vector3.ZERO
+			else:
+				mi.position = Vector3(rng.randf_range(-base, base), rng.randf_range(-base * 0.15, base * 0.25),
+					rng.randf_range(-base * 0.5, base * 0.5))
+			mi.scale = Vector3(1.0, flatten, 1.0)
+			group.add_child(mi)
 
 # ---------------------------------------------------------------- 杂项
 

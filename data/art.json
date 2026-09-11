@@ -18,32 +18,38 @@
     "grid_line":   "#BDB3A0",
     "core_water":  "#3FB3B0",
     "entrance":    "#D4825F",
-    "cloud":       "#EAF1F0"
+    "cloud":       "#EAF1F0",
+    "cloud_top":   "#FFFFFF",
+    "cloud_bottom": "#B9CFD1"
   },
 
   "rock": {
     "_comment": "岛底岩柱：程序化生成，跟着地图走。同种子同地图=同一座岛",
     "seed": 20260911,
-    "edge_depth_min": 2.2,
-    "edge_depth_max": 7.0,
+    "solid_depth": 2.6,
+    "edge_depth_min": 1.0,
+    "edge_depth_max": 3.6,
     "edge_long_chance": 0.55,
-    "inner_depth_min": 1.2,
-    "inner_depth_max": 2.6,
-    "taper": 0.45,
-    "taper_variance": 0.5,
-    "jitter": 0.55
+    "inner_depth_min": 0.4,
+    "inner_depth_max": 1.2,
+    "taper": 0.72,
+    "taper_variance": 0.22,
+    "jitter": 0.26,
+    "skip_chance": 0.22,
+    "top_scale_min": 0.62
   },
 
   "clouds": {
     "enabled": true,
-    "count": 14,
-    "radius_min": 3.0,
-    "radius_max": 6.5,
-    "flatten": 0.18,
-    "y_min": -70.0,
-    "y_max": -42.0,
-    "ring_min": 1.35,
-    "ring_max": 2.6
+    "count": 12,
+    "radius_min": 4.0,
+    "radius_max": 8.0,
+    "flatten": 0.40,
+    "lumps": 3,
+    "y_min": -95.0,
+    "y_max": -60.0,
+    "ring_min": 1.6,
+    "ring_max": 3.4
   },
 
   "environment": {
