@@ -45,8 +45,8 @@ P = {
     "blade_len": 0.42, "blade_w": 0.075, "blade_d": 0.028, "tip_len": 0.10,
     "guard_w": 0.20, "guard_h": 0.035, "grip_len": 0.09,
     # 盾兵
-    "shield_arm_lift": 52.0,   # 左臂前抬角度
-    "shield_fwd": 0.17,        # 盾往前推出多少
+    "shield_arm_lift": 26.0,   # 左臂前抬角度，越小盾越低越贴身
+    "shield_fwd": 0.085,       # 盾往前推出多少
     "shield_side": 0.03,       # 盾再往左手那侧挪一点
     "shield_rx": 0.180, "shield_rz": 0.265, "shield_thick": 0.05,
     "shield_rim": 0.030,       # 边框比盘面大多少
@@ -209,8 +209,10 @@ def build(variant="swordman"):
         if variant == "shieldman" and side == "L":
             rot = (math.radians(P["shield_arm_lift"]), 0, 0)
         arm = joint("Arm%s" % side, (sx * arm_x, 0, shoulder_z), torso, rotation=rot)
+        # 盾兵整体是蓝的，上臂也用会跟着敌人换色的主色；剑士才是红袖子
+        upper_mat = "armor_primary" if variant == "shieldman" else "cloth_red"
         box("Upper%s" % side, (0, 0, -P["upper_arm"] / 2),
-            (P["arm_w"], P["arm_d"], P["upper_arm"]), "cloth_red", arm)
+            (P["arm_w"], P["arm_d"], P["upper_arm"]), upper_mat, arm)
         box("Fore%s" % side, (0, 0, -P["upper_arm"] - P["fore_arm"] / 2),
             (P["arm_w"] * 1.03, P["arm_d"] * 1.03, P["fore_arm"]), "armor_dark", arm)
         if side == "R":

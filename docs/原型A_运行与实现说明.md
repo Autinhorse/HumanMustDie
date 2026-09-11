@@ -233,8 +233,9 @@ python tools/map_from_image.py --image ref/DungeonWarfareMap01.png     --out dat
 并导出 glb。两种敌人共用同一套骨架：
 
 - `--variant swordman` → `assets/models/swordman.glb`
-- `--variant shieldman` → `assets/models/shieldman.glb`，左臂抬起来托一面椭圆盾
-  （金色边框 + 贯穿上下左右的金色十字），右手照旧持剑
+- `--variant shieldman` → `assets/models/shieldman.glb`，左臂微抬、盾贴在身侧
+  （金色边框 + 贯穿上下左右的金色十字），右手照旧持剑。盾兵的上臂用会跟着敌人
+  换色的主色（整体是蓝的），剑士才是不参与染色的红袖子
 
 `tools
 ebuild_models.bat` 会把两个都生成。**不做骨骼**：每个部件的原点放在关节上
