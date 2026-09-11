@@ -1,0 +1,51 @@
+{
+  "name": "灰盒杀戮走廊 01",
+  "_comment": "格子类型：0 空地(镂空) 1 普通地面 2 墙 3 障碍 4 桥面 5 目标核心。入口由规则推导：地图边缘离核心最远的连通开口。",
+
+  "grid": [
+    "22222222222222",
+    "21111111111112",
+    "21111155111112",
+    "21111155111112",
+    "21111111111112",
+    "21122111221112",
+    "21122111221112",
+    "21111111111112",
+    "20000044000002",
+    "20000244200002",
+    "20000044000002",
+    "21111111111112",
+    "21122111221112",
+    "21122111221112",
+    "21111111111112",
+    "21111111111112",
+    "21111111111112",
+    "21111111111112",
+    "21111111111112",
+    "22222111112222"
+  ],
+
+  "allowed_traps": ["spikes", "tar", "launcher", "push_wall", "saw"],
+
+  "waves": [
+    { "name": "第1波 · 小兵试水",
+      "groups": [ { "enemy": "grunt", "count": 8, "interval": 0.55, "delay": 0.0 } ] },
+
+    { "name": "第2波 · 小兵成堆",
+      "groups": [ { "enemy": "grunt", "count": 10, "interval": 0.35, "delay": 0.0 },
+                  { "enemy": "grunt", "count": 8,  "interval": 0.30, "delay": 5.0 } ] },
+
+    { "name": "第3波 · 中型加入",
+      "groups": [ { "enemy": "grunt", "count": 12, "interval": 0.35, "delay": 0.0 },
+                  { "enemy": "berserker", "count": 3, "interval": 1.2, "delay": 3.0 } ] },
+
+    { "name": "第4波 · 冷却压力",
+      "groups": [ { "enemy": "grunt", "count": 16, "interval": 0.25, "delay": 0.0 },
+                  { "enemy": "berserker", "count": 5, "interval": 0.9, "delay": 4.0 } ] },
+
+    { "name": "第5波 · 重型登场",
+      "groups": [ { "enemy": "grunt", "count": 12, "interval": 0.3, "delay": 0.0 },
+                  { "enemy": "berserker", "count": 4, "interval": 1.0, "delay": 3.0 },
+                  { "enemy": "troll", "count": 1, "interval": 1.0, "delay": 6.0 } ] }
+  ]
+}

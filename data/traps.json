@@ -1,0 +1,73 @@
+{
+  "_comment": "机关效果按文档 15.3 拆成 5 段组件：trigger 触发 / targeting 目标 / payload 伤害 / displacement 冲击位移 / status 状态。空对象表示该机关没有这一段。",
+
+  "spikes": {
+    "name": "地刺",
+    "mount": "ground",
+    "cost": 60,
+    "directional": false,
+    "color": [0.72, 0.70, 0.64],
+    "desc": "周期群体伤害（验证基础伤害与冷却）",
+    "targeting": { "type": "self_cell" },
+    "trigger": { "type": "periodic", "cooldown": 1.6, "require_enemy": true },
+    "payload": { "damage": 26 },
+    "displacement": {},
+    "status": {}
+  },
+
+  "tar": {
+    "name": "黏胶地面",
+    "mount": "ground",
+    "cost": 40,
+    "directional": false,
+    "color": [0.36, 0.55, 0.30],
+    "desc": "减速聚怪（验证停留时间联动）",
+    "targeting": { "type": "self_cell" },
+    "trigger": { "type": "continuous" },
+    "payload": {},
+    "displacement": {},
+    "status": { "slow": 0.45, "duration": 1.0 }
+  },
+
+  "launcher": {
+    "name": "弹射板",
+    "mount": "ground",
+    "cost": 80,
+    "directional": true,
+    "color": [0.88, 0.62, 0.20],
+    "desc": "定向击飞小型敌人（验证物理链路）",
+    "targeting": { "type": "self_cell" },
+    "trigger": { "type": "on_enter", "cooldown": 2.2 },
+    "payload": { "damage": 8 },
+    "displacement": { "force": 15.0, "up": 0.75 },
+    "status": {}
+  },
+
+  "push_wall": {
+    "name": "推墙",
+    "mount": "wall",
+    "cost": 100,
+    "directional": true,
+    "color": [0.56, 0.50, 0.78],
+    "desc": "横向推动一组敌人（核心空间玩法）",
+    "targeting": { "type": "front_box", "length": 2, "width": 3 },
+    "trigger": { "type": "threshold_count", "min_count": 2, "max_wait": 2.0, "cooldown": 3.0 },
+    "payload": { "damage": 6 },
+    "displacement": { "force": 9.0, "up": 0.18 },
+    "status": {}
+  },
+
+  "saw": {
+    "name": "旋转锯墙",
+    "mount": "wall",
+    "cost": 90,
+    "directional": true,
+    "color": [0.82, 0.26, 0.24],
+    "desc": "近距离持续伤害（位移后的处决区）",
+    "targeting": { "type": "front_box", "length": 1, "width": 1 },
+    "trigger": { "type": "continuous" },
+    "payload": { "dps": 55 },
+    "displacement": {},
+    "status": {}
+  }
+}

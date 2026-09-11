@@ -1,0 +1,48 @@
+{
+  "_comment": "stability = 位移阈值（冲击积累需超过它才发生位移）；impact_decay = 每秒冲击衰减",
+
+  "grunt": {
+    "name": "小兵",
+    "class": "小型",
+    "hp": 42,
+    "speed": 3.0,
+    "mass": 1.0,
+    "stability": 0.0,
+    "impact_decay": 1.0,
+    "gold": 5,
+    "core_damage": 1,
+    "radius": 0.42,
+    "height": 1.1,
+    "color": [0.82, 0.82, 0.88]
+  },
+
+  "berserker": {
+    "name": "狂战士",
+    "class": "中型",
+    "hp": 120,
+    "speed": 4.4,
+    "mass": 3.0,
+    "stability": 18.0,
+    "impact_decay": 1.0,
+    "gold": 11,
+    "core_damage": 2,
+    "radius": 0.5,
+    "height": 1.45,
+    "color": [0.9, 0.5, 0.32]
+  },
+
+  "troll": {
+    "name": "巨魔",
+    "class": "重型",
+    "hp": 460,
+    "speed": 1.9,
+    "mass": 10.0,
+    "stability": 45.0,
+    "impact_decay": 1.0,
+    "gold": 28,
+    "core_damage": 5,
+    "radius": 0.78,
+    "height": 2.1,
+    "color": [0.35, 0.62, 0.45]
+  }
+}

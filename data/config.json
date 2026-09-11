@@ -1,0 +1,67 @@
+{
+  "_comment": "全局数值配置。改完存盘后在游戏内按 F5 热重载（会重开当前关）。",
+
+  "grid": {
+    "cell_size": 2.0,
+    "wall_height": 1.0,
+    "floor_thickness": 0.25,
+    "support_depth": 1.8,
+    "cell_gap": 0.06
+  },
+
+  "camera": {
+    "_comment": "斜俯视用正交投影，不做透视；缩放改的是 ortho_size（可视高度，单位=世界米）",
+    "projection": "orthogonal",
+    "pitch_deg": -52.0,
+    "yaw_deg": -40.0,
+    "distance": 60.0,
+    "ortho_size": 46.0,
+    "ortho_min": 12.0,
+    "ortho_max": 90.0,
+    "zoom_step": 3.0,
+    "pan_speed": 22.0,
+    "yaw_step_deg": 45.0
+  },
+
+  "sim": {
+    "step": 0.0166666,
+    "max_steps_per_frame": 40,
+    "speeds": [0.5, 1.0, 2.0, 4.0],
+    "default_speed_index": 1,
+    "seed": 20260911
+  },
+
+  "combat": {
+    "_comment": "位移完全由游戏逻辑驱动，不使用刚体，保证同种子可复现",
+    "gravity": 24.0,
+    "ground_friction": 4.0,
+    "impulse_to_velocity": 0.6,
+    "min_launch_up": 0.25,
+    "fall_kill_y": -8.0,
+    "collision_speed_threshold": 1.8,
+    "collision_damage_coef": 2.2,
+    "collision_impulse_transfer": 0.45,
+    "collision_cooldown": 0.35,
+    "landing_speed_threshold": 7.0,
+    "landing_damage_coef": 1.2,
+    "combo_window": 2.0,
+    "enemy_separation": 0.55
+  },
+
+  "economy": {
+    "start_gold": 320,
+    "core_hp": 20,
+    "wave_clear_gold": 60,
+    "sell_refund": 0.6
+  },
+
+  "entrance": {
+    "_comment": "入口规则：地图边缘上离核心最远的那个开口（地面或桥），整段连通开口都作为出生点",
+    "mode": "farthest_opening"
+  },
+
+  "debug": {
+    "sandbox_gold": 99999,
+    "log_kills": true
+  }
+}
