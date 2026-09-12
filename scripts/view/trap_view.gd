@@ -78,6 +78,8 @@ func setup(model_id: String, cell_size: float, color: Color, anim: Dictionary) -
 		part = _find(model_root, part_name)
 		if part != null:
 			_rest = part.transform
+	if keeps_own_color:
+		_enable_vertex_ao(model_root)
 	_collect_tint(model_root)
 	if not keeps_own_color:
 		set_color(color)
@@ -93,6 +95,24 @@ func _find(node: Node, name: String) -> Node3D:
 		if r != null:
 			return r
 	return null
+
+## 面板的 AO 是烘在顶点色里的。Godot 打开 vertex_color_use_as_albedo 之后
+## ALBEDO = albedo_color × COLOR —— 正好是 AO 的乘算形式，等级色还留在
+## albedo_color 里，两者不冲突。
+## 直接改共享材质即可：同一个模型的所有实例本来就要这个设置，改一次就够。
+func _enable_vertex_ao(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh: Mesh = node.mesh
+		if mesh != null:
+			for i in mesh.get_surface_count():
+				var m := mesh.surface_get_material(i)
+				if m is StandardMaterial3D:
+					var sm: StandardMaterial3D = m
+					sm.vertex_color_use_as_albedo = true
+					# glTF 的顶点色是线性的，别当成 sRGB 再转一次
+					sm.vertex_color_is_srgb = false
+	for c in node.get_children():
+		_enable_vertex_ao(c)
 
 ## 收集可变色的材质。老的机械机关叫 trap_primary，按 traps.json 的 color 换色；
 ## 面板（board_*）的等级色是烘在模型里的，只收进来做冷却压暗，不换色。

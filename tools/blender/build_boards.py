@@ -115,6 +115,21 @@ PARAMS = {
                                     # **所有活动件静止时都对齐到这个高度**
     },
 
+    # ---------------- 顶点色 AO ----------------
+    # 烘出来的原始值 1 = 完全不被遮挡，0 = 全遮住。
+    # 最终顶点色 = 1 - (1 - 原始值) × strength，所以 strength 越大压得越狠。
+    "ao": {
+        "strength":         0.85,   # AO 强度（0 = 关掉）
+        "distance":         0.18,   # 采样距离（格）。比槽深大一点才吃得到槽口
+        "samples":          64,     # Cycles 采样数，够用就行，烘一块也就几秒
+        "floor":            0.30,   # 最暗压到多少，防止角落烘成纯黑
+        "subdiv_edge":      0.045,  # 烘之前先把长过这个值的边切开。
+                                    # **这一步不能省**：顶点色只存在顶点上，一个平面
+                                    # 只有四个角的话 AO 只能在整面上线性插值，
+                                    # 结果就是整块零件一起变暗，而不是接缝处出暗角。
+        "subdiv_passes":    5,      # 最多切几轮
+    },
+
     # ---------------- 尖刺板 ----------------
     # 内板做成「井」字：外圈 Plate + 十字隔条 PlateCross，中间空出四个方槽。
     # 槽壁贴暗色内衬 Liner，槽底是砖体 Base 的顶面。
@@ -733,13 +748,142 @@ BUILDERS = {"spring": build_spring, "spikes": build_spikes, "push": build_push}
 
 # ----------------------------------------------------------------- 导出与预览
 
+def apply_modifiers():
+    """烘 AO 之前先把倒角等修改器实体化 —— 顶点色是存在顶点上的，
+    修改器没应用的话，倒角新生成的那圈顶点拿不到自己的 AO。"""
+    for ob in list(bpy.data.objects):
+        if ob.type != "MESH":
+            continue
+        bpy.context.view_layer.objects.active = ob
+        for m in list(ob.modifiers):
+            try:
+                bpy.ops.object.modifier_apply(modifier=m.name)
+            except RuntimeError:
+                ob.modifiers.remove(m)
+
+
+def subdivide_for_ao(max_edge, passes):
+    """烘 AO 之前细分：把过长的边切开，让平面内部也有顶点承载 AO。
+
+    自适应切 —— 只切长过 max_edge 的边，小零件不会被无谓地炸开。
+    """
+    import bmesh
+    before = after = 0
+    for ob in bpy.data.objects:
+        if ob.type != "MESH":
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        before += len(bm.faces)
+        for _ in range(passes):
+            long_edges = [e for e in bm.edges if e.calc_length() > max_edge]
+            if not long_edges:
+                break
+            bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
+        after += len(bm.faces)
+        bm.to_mesh(ob.data)
+        bm.free()
+    print("AO_SUBDIV 面数 %d -> %d" % (before, after))
+
+
+def _group_of(ob):
+    n = ob
+    while n is not None:
+        if n.name in ("Frame", "Mover"):
+            return n.name
+        n = n.parent
+    return "Frame"
+
+
+def _bake_group(meshes, others, samples):
+    """只让 meshes 参与烘焙，others 临时从渲染里摘掉（不参与遮挡）。"""
+    if not meshes:
+        return
+    for ob in others:
+        ob.hide_render = True
+    bpy.ops.object.select_all(action="DESELECT")
+    for ob in meshes:
+        ob.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.bake(type="AO")
+    for ob in others:
+        ob.hide_render = False
+
+
+def bake_ao():
+    """把 AO 烘进每个网格的顶点色。"""
+    cfg = PARAMS["ao"]
+    if cfg["strength"] <= 0.0:
+        return
+    scene = bpy.context.scene
+    if scene.world is None:
+        scene.world = bpy.data.worlds.new("AOWorld")
+    scene.world.light_settings.distance = cfg["distance"]
+
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = int(cfg["samples"])
+    scene.render.bake.target = "VERTEX_COLORS"
+    scene.render.bake.use_pass_direct = False
+    scene.render.bake.use_pass_indirect = False
+
+    subdivide_for_ao(cfg["subdiv_edge"], int(cfg["subdiv_passes"]))
+
+    meshes = [o for o in bpy.data.objects if o.type == "MESH"]
+    for ob in meshes:
+        me = ob.data
+        if not me.color_attributes:
+            me.color_attributes.new(name="Col", type="BYTE_COLOR", domain="CORNER")
+        me.color_attributes.active_color_index = 0
+
+    frame = [o for o in meshes if _group_of(o) == "Frame"]
+    mover = [o for o in meshes if _group_of(o) == "Mover"]
+    # 固定件互相遮挡；活动件只算自遮挡（静止时埋在槽里，别把槽的阴影烘进去）
+    _bake_group(frame, mover, cfg["samples"])
+    _bake_group(mover, frame, cfg["samples"])
+
+    # 调强度 + 兜底，避免角落烘成纯黑
+    k, floor = cfg["strength"], cfg["floor"]
+    for ob in meshes:
+        col = ob.data.color_attributes.active_color
+        if col is None:
+            continue
+        for d in col.data:
+            v = 1.0 - (1.0 - d.color[0]) * k
+            v = floor + (1.0 - floor) * v
+            d.color = (v, v, v, 1.0)
+    print("AO_BAKED %d 个网格" % len(meshes))
+
+
+def preview_vertex_color():
+    """只给预览渲染用：把顶点色乘进 Base Color，这样预览图看到的和游戏里一致。
+    必须在导出之后调 —— glTF 导出器碰到接了节点的 Base Color 会另作处理。"""
+    for m in bpy.data.materials:
+        if not m.use_nodes:
+            continue
+        b = m.node_tree.nodes.get("Principled BSDF")
+        if b is None:
+            continue
+        base = tuple(b.inputs["Base Color"].default_value)
+        vc = m.node_tree.nodes.new("ShaderNodeVertexColor")
+        vc.layer_name = "Col"
+        mix = m.node_tree.nodes.new("ShaderNodeMixRGB")
+        mix.blend_type = "MULTIPLY"
+        mix.inputs["Fac"].default_value = 1.0
+        mix.inputs["Color1"].default_value = base
+        m.node_tree.links.new(vc.outputs["Color"], mix.inputs["Color2"])
+        m.node_tree.links.new(mix.outputs["Color"], b.inputs["Base Color"])
+
+
 def export(path):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(filepath=os.path.abspath(path), export_format="GLB",
                               export_apply=True, export_yup=True, use_selection=True,
                               export_materials="EXPORT", export_animations=False,
-                              export_skins=False)
+                              export_skins=False,
+                              # 材质没接 Color Attribute 节点，用 MATERIAL 模式就不会导出
+                              # 顶点色了，必须显式给 ACTIVE
+                              export_vertex_color="ACTIVE")
     print("EXPORTED %s" % os.path.abspath(path))
 
 
@@ -833,13 +977,18 @@ def arg(name, default=None):
     return default
 
 
-def build_one(variant, tier, out_path, render_dir, part_map_dir=None):
+def build_one(variant, tier, out_path, render_dir, part_map_dir=None, ao=True):
     global _tier
     _tier = tier
     clear()
     root = joint("Root", (0, 0, 0))
     BUILDERS[variant](root)
+    if ao:
+        apply_modifiers()       # 顶点色存在顶点上，倒角得先实体化
+        bake_ao()
     export(out_path)
+    if ao:
+        preview_vertex_color()  # 只影响预览渲染，导出已经做完了
     res = 760 if part_map_dir else 460
     target_dir = part_map_dir or render_dir
     if target_dir:
@@ -855,6 +1004,7 @@ def main():
     out = arg("--out", "assets/models")
     render_dir = arg("--render-dir")
     part_map_dir = arg("--part-map")
+    ao = "--no-ao" not in (sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
     variants = [variant] if variant else VARIANTS
     tiers = [int(tier)] if tier else TIERS
@@ -866,7 +1016,7 @@ def main():
             sys.exit(1)
         for t in tiers:
             path = out if single else os.path.join(out, "board_%s_%d.glb" % (v, t))
-            build_one(v, t, path, render_dir, part_map_dir)
+            build_one(v, t, path, render_dir, part_map_dir, ao)
 
 
 if __name__ == "__main__":
