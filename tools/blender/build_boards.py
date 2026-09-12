@@ -92,21 +92,23 @@ PARAMS = {
     # ---------------- 三种板共用的外框（floor_frame）----------------
     # 从外到内的层次：石缘 Kerb -> 金框 Gold -> 暗凹槽 Groove -> 内板
     "frame": {
-        "kerb_outer":       0.500,  # 石缘外沿。0.5 正好填满一格，别超
-        "kerb_inner":       0.455,  # 石缘内沿；和上面的差 = 石缘宽度（现 0.045）
-        "kerb_top":         0.050,  # 石缘高度
-        "gold_inner":       0.400,  # 金框内沿；kerb_inner 到这里 = 金框宽度（现 0.055）
+        # 没有石缘（Kerb）—— 板子直接坐在地面上，金框外沿就是格子边
+        "gold_outer":       0.500,  # 金框外沿 = 半个格子，正好顶到格子边，别超
+        "gold_inner":       0.400,  # 金框内沿；两者之差 = 金框宽度（现 0.100）
         "gold_top":         0.078,  # 金框高度（一级）
         "gold_top_step":    0.008,  # 每级加高多少
         "groove_width":     0.030,  # 金框内侧那圈暗凹槽的宽度。
                                     # 它负责把金框和内板分开，去掉的话整块板会糊成一片
         "groove_below":     0.014,  # 凹槽底面比内板低多少
         "goldline_width":   0.016,  # 二级起，金框外侧那道暗金细线的宽度
-        "bolt_radius":      0.074,  # 四角铆钉半径（一级）
-        "bolt_radius_step": 0.006,
-        "bolt_inset":       0.018,  # 铆钉中心从石缘内沿再往外挪多少
-        "bolt_body_h":      0.070,  # 铆钉主体高度
-        "bolt_cap_h":       0.030,  # 铆钉顶上那圈收口的高度
+
+        # 四角铆钉：正方形，外沿和金框外沿齐平（也就是正好占住格子的四个角）
+        "bolt_size":        0.155,  # 正方形边长（一级）
+        "bolt_size_step":   0.008,  # 每级加大多少
+        "bolt_cut":         0.3333, # 朝格子内侧那个角切斜角，下刀在两条边的这个比例处
+        "bolt_body_h":      0.098,  # 铆钉主体高度（比金框略高，才看得出是颗钉）
+        "bolt_cap_h":       0.028,  # 顶上那层收口的高度
+        "bolt_cap_scale":   0.72,   # 收口相对主体缩小多少（外角仍贴着格子边）
         "plate_top":        0.062,  # 内板上表面。**所有活动件静止时都对齐到这个高度**
     },
 
@@ -402,13 +404,31 @@ def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0
         box("%s%d" % (name, i), (cx0 + cx, cy0 + cy, cz), (sx, sy, h), material, parent, bevel)
 
 
-def bolts(name, parent, r, z, material, size=0.052):
-    """角铆钉：八边形小柱 + 一层收口，参考图里四角各一颗。"""
-    for i, (cx, cy) in enumerate(((r, r), (-r, r), (r, -r), (-r, -r))):
-        cyl("%s%d" % (name, i), (cx, cy, z), size, 0.070, material, parent,
-            sides=8, rot_z=math.radians(22.5))
-        cyl("%sT%d" % (name, i), (cx, cy, z + 0.040), size * 0.72, 0.030, material, parent,
-            sides=8, rot_z=math.radians(22.5))
+def bracket_pts(outer, size, cut, sx, sy):
+    """一颗方形角铆钉的轮廓（逆时针）。
+
+    正方形的外角落在 (outer, outer)，也就是格子的角上；朝格子内侧的那个角
+    切掉一个斜角，下刀位置在两条边的 size*cut 处。sx/sy 是镜像到另外三个角用的。
+    """
+    o, sz, c = outer, size, size * cut
+    pts = [(o - sz + c, o - sz),   # 斜角起点（在一条边的 1/3 处）
+           (o, o - sz),            # 外侧那条边
+           (o, o),                 # 外角 —— 正好是格子的角
+           (o - sz, o),
+           (o - sz, o - sz + c)]   # 斜角终点（在另一条边的 1/3 处）
+    pts = [(x * sx, y * sy) for x, y in pts]
+    if sx * sy < 0:
+        pts.reverse()              # 镜像一次会把朝向翻过来，点序得倒回去
+    return pts
+
+
+def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_scale, material):
+    """四角的方形铆钉：主体 + 顶上一层收口。收口只往内缩，外角照样贴着格子边。"""
+    for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
+        prism("%s%d" % (name, i), bracket_pts(outer, size, cut, sx, sy),
+              0.0, body_h, material, parent, bevel=0.005)
+        prism("%sT%d" % (name, i), bracket_pts(outer, size * cap_scale, cut, sx, sy),
+              body_h, body_h + cap_h, material, parent, bevel=0.005)
 
 
 # ----------------------------------------------------------------- 共用的边框
@@ -429,22 +449,22 @@ def tier_val(base, step):
 def floor_frame(frame):
     """地面板共用的边框，从外到内：
 
-      Kerb      石缘，奶白色，最外一圈，和地砖同色
-      Gold      金框
-      GoldLine  二级起金框外侧的暗金细线
-      Bolt      四角的八角铆钉（BoltT 是它顶上的收口）
+      Gold      金框，外沿直接顶到格子边（没有石缘，板子就坐在地面上）
+      GoldLine  二级起金框内侧的暗金细线
+      Bolt      四角的**方形**铆钉，外角贴着格子角，朝内的角切斜角
+                （BoltT 是它顶上的收口）
       Groove    金框内侧的暗凹槽 —— 靠它把金框和内板分开，去掉整块板会糊成一片
     """
-    ring("Kerb", frame, fp("kerb_outer"), fp("kerb_inner"), 0.0, fp("kerb_top"), "board_stone")
     gold_h = tier_val(fp("gold_top"), fp("gold_top_step"))
-    ring("Gold", frame, fp("kerb_inner"), fp("gold_inner"), 0.0, gold_h, "board_gold")
+    ring("Gold", frame, fp("gold_outer"), fp("gold_inner"), 0.0, gold_h, "board_gold")
     ring("Groove", frame, fp("gold_inner"), fp("gold_inner") - fp("groove_width"),
          0.0, fp("plate_top") - fp("groove_below"), "board_recess")
     if _tier >= 2:
         ring("GoldLine", frame, fp("gold_inner") + fp("goldline_width"), fp("gold_inner"),
              0.0, gold_h + 0.010, "board_gold_dark")
-    bolts("Bolt", frame, fp("kerb_inner") - fp("bolt_inset"), gold_h - 0.018, "board_gold",
-          size=tier_val(fp("bolt_radius"), fp("bolt_radius_step")))
+    bolts("Bolt", frame, fp("gold_outer"),
+          tier_val(fp("bolt_size"), fp("bolt_size_step")), fp("bolt_cut"),
+          fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_scale"), "board_gold")
 
 
 def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.25):
