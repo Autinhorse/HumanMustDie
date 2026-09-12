@@ -512,6 +512,20 @@ func _update_zoom_readability() -> void:
 	var ms := float(cfg.get("marker_start", 30.0))
 	var mf := float(cfg.get("marker_full", 60.0))
 	game.view_marker = clampf((_ortho_size - ms) / max(mf - ms, 0.001), 0.0, 1.0)
+	_update_outline_fade()
+
+## 描边是固定像素宽的，拉远时单位只有二十来像素高，线一夹主体就糊了。
+## 所以拉远时把描边淡掉 —— 那个距离上靠地面标记来保证看得见。
+func _update_outline_fade() -> void:
+	if _outline == null:
+		return
+	var env_cfg: Dictionary = Cfg.art.get("environment", {})
+	var a := _ec(env_cfg, "outline_fade_start", 30.0)
+	var b := _ec(env_cfg, "outline_fade_end", 52.0)
+	var t: float = clampf((_ortho_size - a) / max(b - a, 0.001), 0.0, 1.0)
+	var mat := _outline.material_override as ShaderMaterial
+	if mat != null:
+		mat.set_shader_parameter("strength", _ec(env_cfg, "outline_strength", 0.95) * (1.0 - t))
 
 ## 按地图大小自动取景：把地图四角投到相机平面，算出需要多大的正交高度
 func _fit_camera_to_map() -> void:

@@ -132,11 +132,13 @@
     "adjust_saturation": 1.12,
 
     "outline_enabled": true,
-    "outline_color": "#1C2228",
+    "outline_color": "#4D5560",
     "outline_thickness": 1.2,
     "outline_depth_threshold": 0.08,
     "outline_normal_threshold": 0.22,
     "outline_strength": 0.95,
+    "outline_fade_start": 30.0,
+    "outline_fade_end": 52.0,
     "outline_depth_fade": 120.0
   },
 

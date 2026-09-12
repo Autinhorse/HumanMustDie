@@ -4,12 +4,14 @@
 shader_type spatial;
 // blend_mix + 只输出线本身：不能去读屏幕拷贝再整屏覆盖，那样会把半透明物体
 // （地面标记、放置预览、云）全擦掉 —— Godot 的屏幕拷贝发生在半透明通道之前。
-render_mode unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_disabled, blend_mix;
+// blend_mul：把底下的颜色"压暗"而不是盖一层黑。纯黑描边在小物体上会把主体吃掉，
+// 乘算能保留色相，远看是深色边缘而不是黑糊。
+render_mode unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_disabled, blend_mul;
 
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest, repeat_disable;
 uniform sampler2D normal_tex : hint_normal_roughness_texture, filter_nearest, repeat_disable;
 
-uniform vec4 outline_color : source_color = vec4(0.11, 0.13, 0.17, 1.0);
+uniform vec4 outline_color : source_color = vec4(0.30, 0.33, 0.38, 1.0);  // 乘算系数，越小越黑
 uniform float thickness = 1.0;          // 线宽，单位是像素
 // 正交相机下相机离场景很远，用"相对深度差"阈值会永远够不到，必须用绝对值（世界单位）
 uniform float depth_threshold = 0.12;   // 相邻像素深度差超过这么多米算一条边
@@ -50,6 +52,6 @@ void fragment() {
 	// 天空/背景（深度极远）不描边。Godot 的 fragment 里不能 return，用系数屏蔽。
 	e *= 1.0 - step(depth_fade * 2.0, d0);
 
-	ALBEDO = outline_color.rgb;
-	ALPHA = clamp(e, 0.0, 1.0);
+	ALBEDO = mix(vec3(1.0), outline_color.rgb, clamp(e, 0.0, 1.0));
+	ALPHA = 1.0;
 }
