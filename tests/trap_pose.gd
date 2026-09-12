@@ -37,7 +37,7 @@ func _ready() -> void:
 
 			var v := TrapView.new()
 			add_child(v)
-			if not v.setup(String(d.get("model", "")), cs, Cfg.to_color(d.get("color"), Color.GRAY), anim):
+			if not v.setup(TrapView.model_for(d), cs, Cfg.to_color(d.get("color"), Color.GRAY), anim):
 				push_error("机关模型载入失败：" + id)
 				get_tree().quit(1)
 				return

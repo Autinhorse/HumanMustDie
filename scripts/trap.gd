@@ -75,7 +75,7 @@ func step(dt: float) -> void:
 
 func _build_view() -> void:
 	var cs: float = game.grid.cell_size
-	var model_id := String(data.get("model", ""))
+	var model_id := TrapView.model_for(data)
 	if model_id != "":
 		var v := TrapView.new()
 		add_child(v)
@@ -130,8 +130,10 @@ func _make_arrow(cs: float) -> MeshInstance3D:
 func _refresh_tint() -> void:
 	var cd := cooldown_ratio()
 	if view != null:
-		# 冷却中压暗，和原来的色块表现一致
-		view.set_color(_base_color.lerp(Color(0.30, 0.30, 0.33), cd * 0.55))
+		if view.keeps_own_color:
+			view.set_dim(cd * 0.55)          # 面板：等级色是模型自带的，只压暗
+		else:
+			view.set_color(_base_color.lerp(Color(0.30, 0.30, 0.33), cd * 0.55))
 		return
 	if _mat == null:
 		return

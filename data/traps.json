@@ -24,21 +24,22 @@
     },
     "displacement": {},
     "status": {},
-    "model": "trap_spikes",
+    "model": "board_spikes",
     "anim": {
-      "part": "Spikes",
+      "part": "Mover",
       "type": "slide",
       "axis": [
         0,
         1,
         0
       ],
-      "rest": -0.3,
-      "fire": 0.02,
-      "attack": 0.05,
+      "rest": 0.0,
+      "fire": 0.3,
+      "attack": 0.045,
       "hold": 0.18,
-      "release": 0.35
-    }
+      "release": 0.34
+    },
+    "tier": 1
   },
   "tar": {
     "name": "黏胶地面",
@@ -102,9 +103,9 @@
       "up": 0.75
     },
     "status": {},
-    "model": "trap_launcher",
+    "model": "board_spring",
     "anim": {
-      "part": "Plate",
+      "part": "Mover",
       "type": "rotate",
       "axis": [
         1,
@@ -112,11 +113,12 @@
         0
       ],
       "rest": 0.0,
-      "fire": 62.0,
+      "fire": 64.0,
       "attack": 0.05,
       "hold": 0.1,
       "release": 0.45
-    }
+    },
+    "tier": 1
   },
   "push_wall": {
     "name": "推墙",
@@ -148,9 +150,9 @@
       "up": 0.18
     },
     "status": {},
-    "model": "trap_push_wall",
+    "model": "board_push",
     "anim": {
-      "part": "Ram",
+      "part": "Mover",
       "type": "slide",
       "axis": [
         0,
@@ -158,11 +160,12 @@
         -1
       ],
       "rest": 0.0,
-      "fire": 0.42,
+      "fire": 0.4,
       "attack": 0.07,
       "hold": 0.14,
       "release": 0.45
-    }
+    },
+    "tier": 1
   },
   "saw": {
     "name": "旋转锯墙",

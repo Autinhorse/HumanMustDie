@@ -104,7 +104,7 @@ func _test_trap_view() -> PackedStringArray:
 	var cs := 2.0
 	for id in ["spikes", "tar", "launcher", "push_wall", "saw"]:
 		var d: Dictionary = Cfg.traps.get(id, {})
-		var model := String(d.get("model", ""))
+		var model := TrapView.model_for(d)
 		_check(model != "", "%s 没配 model" % id, errs)
 		var anim: Dictionary = d.get("anim", {})
 		_check(not anim.is_empty(), "%s 没配 anim" % id, errs)

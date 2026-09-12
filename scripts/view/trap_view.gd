@@ -35,8 +35,21 @@ var _bob_speed := 1.0
 var _fire_t := 999.0        # 距离上次触发过了多久
 var _time := 0.0
 var _tint_mats: Array[StandardMaterial3D] = []
+var _tint_base: Array[Color] = []
+## 模型自带配色（面板那套）时不按 traps.json 的 color 换色
+var keeps_own_color := false
+
+## traps.json 的一条机关数据 -> 模型文件名。tier 只是名字后缀：
+## board_spikes + tier 2 -> board_spikes_2。游戏和测试都走这里，
+## 免得两边各算各的（T7 抓到过一次）。
+static func model_for(data: Dictionary) -> String:
+	var id := String(data.get("model", ""))
+	if id != "" and data.has("tier"):
+		id += "_%d" % int(Cfg.dget(data, "tier", 1.0))
+	return id
 
 func setup(model_id: String, cell_size: float, color: Color, anim: Dictionary) -> bool:
+	keeps_own_color = model_id.begins_with("board_")
 	var path := MODEL_DIR + model_id + ".glb"
 	if not _scene_cache.has(path):
 		_scene_cache[path] = load(path) if ResourceLoader.exists(path) else null
@@ -66,7 +79,8 @@ func setup(model_id: String, cell_size: float, color: Color, anim: Dictionary) -
 		if part != null:
 			_rest = part.transform
 	_collect_tint(model_root)
-	set_color(color)
+	if not keeps_own_color:
+		set_color(color)
 	_apply(0.0)
 	ok = true
 	return true
@@ -80,23 +94,36 @@ func _find(node: Node, name: String) -> Node3D:
 			return r
 	return null
 
-## 模型里叫 trap_primary 的材质按机关自己的颜色换，其余（金属、黄铜、刃）固定
+## 收集可变色的材质。老的机械机关叫 trap_primary，按 traps.json 的 color 换色；
+## 面板（board_*）的等级色是烘在模型里的，只收进来做冷却压暗，不换色。
 func _collect_tint(node: Node) -> void:
 	if node is MeshInstance3D:
 		var mesh: Mesh = node.mesh
 		if mesh != null:
 			for i in mesh.get_surface_count():
 				var m := mesh.surface_get_material(i)
-				if m != null and String(m.resource_name).begins_with("trap_primary"):
+				if m == null:
+					continue
+				var rn := String(m.resource_name)
+				if rn.begins_with("trap_primary") or rn.begins_with("board_accent"):
 					var dup: StandardMaterial3D = m.duplicate()
 					node.set_surface_override_material(i, dup)
 					_tint_mats.append(dup)
+					_tint_base.append(dup.albedo_color)
 	for c in node.get_children():
 		_collect_tint(c)
 
 func set_color(c: Color) -> void:
-	for m in _tint_mats:
-		m.albedo_color = c
+	for i in _tint_mats.size():
+		_tint_mats[i].albedo_color = c
+		_tint_base[i] = c
+
+## 冷却时压暗。面板的等级色不能被换掉，所以这里是在**原色基础上**压暗，
+## 而不是像老机关那样整个换成冷却色。
+func set_dim(f: float) -> void:
+	var k: float = clampf(f, 0.0, 1.0)
+	for i in _tint_mats.size():
+		_tint_mats[i].albedo_color = _tint_base[i].lerp(Color(0.34, 0.34, 0.38), k)
 
 func _process(delta: float) -> void:
 	# 自己驱动：待机动作在建造阶段也要动，不能只在战斗里跑
