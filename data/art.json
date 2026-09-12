@@ -84,22 +84,42 @@
     "marker_radius_mul": 1.5
   },
 
+  "void_pit": {
+    "_comment": "被岛围住的空地格底下补一层暗面，坑才有深度；否则从洞里看到的是天空，像挖了个洞。岛外的空地不画，保持悬浮感。",
+    "enabled": true,
+    "depth": 3.4,
+    "color": "#2B3540",
+    "clouds": 8,
+    "cloud_color": "#9FB2BD",
+    "cloud_y_min": -9.0,
+    "cloud_y_max": -4.0,
+    "cloud_radius": 1.8
+  },
+
+  "core_fx": {
+    "_comment": "核心是全局焦点，让它缓慢呼吸。pulse 是发光强度起伏，bob 是水面上下浮动。",
+    "pulse_speed": 1.1,
+    "pulse_amount": 0.45,
+    "bob_speed": 0.9,
+    "bob_amount": 0.022
+  },
+
   "environment": {
     "sky_top":     "#6B8C91",
     "sky_horizon": "#A6C1C0",
     "ground_horizon": "#8FA9A8",
     "ground_bottom": "#6E8A89",
-    "ambient_color": "#C0C2BE",
-    "ambient_energy": 0.3,
+    "ambient_color": "#A6B2C6",
+    "ambient_energy": 0.36,
     "tonemap": "filmic",
     "exposure": 0.88,
     "white": 1.0,
 
     "fog_enabled": true,
-    "fog_color": "#BDD2D0",
-    "fog_density": 0.0008,
+    "fog_color": "#C3D2D8",
+    "fog_density": 0.0018,
     "fog_sky_affect": 0.0,
-    "fog_aerial_perspective": 0.08,
+    "fog_aerial_perspective": 0.32,
 
     "ssao_enabled": true,
     "ssao_radius": 1.0,
@@ -112,10 +132,10 @@
     "sun_azimuth_deg": 35.0,
     "sun_angular_distance_deg": 1.2,
     "shadow_blur": 0.8,
-    "fill_color": "#CBD2CC",
+    "fill_color": "#AFC0D6",
     "fill_energy": 0.12,
 
-    "rim_color": "#D6D8D2",
+    "rim_color": "#C6D4E2",
     "rim_energy": 0.55,
     "rim_elevation_deg": 10.0,
     "rim_azimuth_offset_deg": 155.0,

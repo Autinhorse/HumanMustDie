@@ -10,6 +10,9 @@ var grid: HGrid = null
 
 var _board: MeshInstance3D = null
 var _water: MeshInstance3D = null
+var _water_mat: StandardMaterial3D = null
+var _water_y := 0.0
+var _core_t := 0.0
 
 # 本次构建缓存的尺寸与配色
 var _cs := 2.0
@@ -118,6 +121,7 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 	add_child(_board)
 
 	_build_core(pal)
+	_build_void_pit()
 
 # ---------------------------------------------------------------- 构件
 
@@ -275,6 +279,96 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, colo
 		st.set_color(Color(color.r * f, color.g * f, color.b * f, color.a))
 		st.add_vertex(pts[k])
 
+## 被岛围住的空地格底下补一层暗面 —— 否则从坑里看到的是天空，像"挖了个洞"。
+## 岛外的空地不画，悬浮感要留着。
+func _build_void_pit() -> void:
+	var cfg: Dictionary = Cfg.art.get("void_pit", {})
+	if not bool(cfg.get("enabled", true)):
+		return
+	var inner := _enclosed_void_cells()
+	if inner.is_empty():
+		return
+	var depth := float(cfg.get("depth", 7.0))
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	var col := _col(Cfg.art.get("void_pit", {}), "color", Color(0.24, 0.29, 0.33))
+	for c in inner:
+		var p := grid.cell_center(c)
+		_top_quad(st, Vector3(p.x, -depth, p.z), _cs, 0.0, col)
+	st.generate_normals()
+	var pit := MeshInstance3D.new()
+	pit.name = "VoidPit"
+	pit.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pit.material_override = m
+	pit.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pit)
+
+	# 坑里飘几团雾，遮住"平底"的感觉
+	var n := int(cfg.get("clouds", 8))
+	if n <= 0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(Cfg.art.get("rock", {}).get("seed", 20260911)) + 91
+	var cmat := StandardMaterial3D.new()
+	cmat.albedo_color = _col(cfg, "cloud_color", Color(0.62, 0.70, 0.74))
+	cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for i in n:
+		var c: Vector2i = inner[rng.randi_range(0, inner.size() - 1)]
+		var mi := MeshInstance3D.new()
+		var sp := SphereMesh.new()
+		var r := float(cfg.get("cloud_radius", 2.6)) * rng.randf_range(0.7, 1.3)
+		sp.radius = r
+		sp.height = r * 2.0
+		sp.radial_segments = 10
+		sp.rings = 5
+		mi.mesh = sp
+		mi.material_override = cmat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var p := grid.cell_center(c)
+		mi.position = Vector3(p.x + rng.randf_range(-1.0, 1.0), 
+			rng.randf_range(float(cfg.get("cloud_y_min", -16.0)), float(cfg.get("cloud_y_max", -6.0))),
+			p.z + rng.randf_range(-1.0, 1.0))
+		mi.scale = Vector3(1.0, 0.35, 1.0)
+		add_child(mi)
+
+## 从地图边缘往里灌水，灌不到的空地格就是被岛围住的坑
+func _enclosed_void_cells() -> Array[Vector2i]:
+	var outside := {}
+	var stack: Array[Vector2i] = []
+	for x in grid.w:
+		for y in [0, grid.h - 1]:
+			var c := Vector2i(x, y)
+			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
+				outside[c] = true
+				stack.append(c)
+	for y in grid.h:
+		for x in [0, grid.w - 1]:
+			var c := Vector2i(x, y)
+			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
+				outside[c] = true
+				stack.append(c)
+	while not stack.is_empty():
+		var c: Vector2i = stack.pop_back()
+		for d in HGrid.DIRS:
+			var n: Vector2i = c + d
+			if grid.in_bounds(n) and grid.get_cell(n) == HGrid.Cell.VOID and not outside.has(n):
+				outside[n] = true
+				stack.append(n)
+	var out: Array[Vector2i] = []
+	for y in grid.h:
+		for x in grid.w:
+			var c := Vector2i(x, y)
+			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
+				out.append(c)
+	return out
+
 func _build_core(pal: Dictionary) -> void:
 	var cores := grid.cells_of_type(HGrid.Cell.CORE)
 	if cores.is_empty():
@@ -317,6 +411,8 @@ func _build_core(pal: Dictionary) -> void:
 	water_mat.emission = water_col
 	water_mat.emission_energy_multiplier = 0.45
 	_water.material_override = water_mat
+	_water_mat = water_mat
+	_water_y = _water.position.y
 	add_child(_water)
 
 # ---------------------------------------------------------------- 杂项
@@ -348,3 +444,14 @@ func _col(pal: Dictionary, key: String, def: Color) -> Color:
 	if pal.has(key) and typeof(pal[key]) == TYPE_STRING:
 		return Color(String(pal[key]))
 	return def
+
+
+## 核心是全局焦点，让它缓慢呼吸：发光强度起伏 + 水面上下浮动
+func _process(delta: float) -> void:
+	if _water == null or _water_mat == null:
+		return
+	var cfg: Dictionary = Cfg.art.get("core_fx", {})
+	_core_t += delta
+	var pulse: float = sin(_core_t * float(cfg.get("pulse_speed", 1.1)))
+	_water_mat.emission_energy_multiplier = 0.45 + float(cfg.get("pulse_amount", 0.45)) * (pulse * 0.5 + 0.5)
+	_water.position.y = _water_y + sin(_core_t * float(cfg.get("bob_speed", 0.9))) * float(cfg.get("bob_amount", 0.022))
