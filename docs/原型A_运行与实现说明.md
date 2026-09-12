@@ -213,8 +213,19 @@ tests/
 - **云必须用体积雾**（`FogVolume` + `environment.volumetric_*`），不能用压扁的球体。
   球体加上无光照材质渲染出来是一个个纯色圆片，既没有渐变也没有体积感。
   已实测：Godot 的体积雾在**正交相机下工作正常**（透视和正交渲染结果基本一致）。
-  两个要点：全局 `volumetric_fog_density` 给 0，让密度完全由各个 FogVolume 提供；
-  光只从一个方向来，背光那半会发灰，给 `FogMaterial.emission` 加一点自发光才够白。
+  三个要点：
+  1. 全局 `volumetric_fog_density` 给 0，让密度完全由各个 FogVolume 提供；
+  2. 光只从一个方向来，背光那半会发灰，给 `FogMaterial.emission` 加一点自发光才够白；
+  3. **必须关掉时间重投影**（`volumetric_fog_temporal_reprojection_enabled = false`）。
+     它拿上一帧结果做累积，而那套重投影是按透视写的，正交相机下会算错 —— 表现就是
+     云每隔几帧整片跳一次，静态截图完全看不出来。实测云区平均帧间差 0.3855 -> 0.0000。
+
+  查这类"动起来才有"的问题，用 `--shot-seq N` 连拍若干帧再比逐帧差异，比盯着看可靠：
+
+  ```
+  ... res://tests/demo.tscn -- --shot D:/f.png --shot-seq 8
+  ```
+  注意取样区要避开界面面板，否则面板上变化的数字会被算成画面抖动。
 - **屏幕空间描边默认关闭**（`environment.outline_enabled`）。它会让画面偏卡通，而本项目
   的机关结构偏机械、细节多，卡通渲染会压掉细节；而且它的线宽是固定像素，拉远时会把小
   单位糊成一团。代码保留着，想试随时打开。下面两条是当时踩过的坑，留作记录：

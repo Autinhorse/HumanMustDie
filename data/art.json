@@ -93,9 +93,9 @@
     "radius_min": 5.0,
     "radius_max": 11.0,
     "flatten": 0.5,
-    "density": 5.0,
+    "density": 2.8,
     "edge_fade": 0.35,
-    "emission": "#7C858A",
+    "emission": "#6E777C",
     "margin": 2.0,
     "color": "#DCE6E8",
     "_alpha_unused": 1.0
@@ -133,6 +133,8 @@
     "volumetric_ambient_inject": 1.0,
     "volumetric_gi_inject": 1.0,
     "volumetric_anisotropy": 0.2,
+    "volumetric_temporal_reprojection": false,
+    "volumetric_temporal_amount": 0.9,
     "sun_volumetric_energy": 4.5,
 
     "ssao_enabled": true,

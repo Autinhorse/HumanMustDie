@@ -295,6 +295,10 @@ func _make_environment(env_cfg: Dictionary) -> Environment:
 		e.volumetric_fog_ambient_inject = _ec(env_cfg, "volumetric_ambient_inject", 1.0)
 		e.volumetric_fog_gi_inject = _ec(env_cfg, "volumetric_gi_inject", 1.0)
 		e.volumetric_fog_anisotropy = _ec(env_cfg, "volumetric_anisotropy", 0.2)
+		# 正交相机下时间重投影会算错，表现为云每隔几帧整片跳变一次。
+		# 关掉它画面就稳了，代价是少了一点时间累积的平滑。
+		e.volumetric_fog_temporal_reprojection_enabled = bool(env_cfg.get("volumetric_temporal_reprojection", false))
+		e.volumetric_fog_temporal_reprojection_amount = _ec(env_cfg, "volumetric_temporal_amount", 0.9)
 
 	if bool(env_cfg.get("ssao_enabled", true)):
 		e.ssao_enabled = true

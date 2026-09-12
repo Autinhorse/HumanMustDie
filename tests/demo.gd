@@ -69,6 +69,19 @@ func _maybe_screenshot() -> void:
 	if pitch > 0.0:
 		m.set_pitch(pitch)
 	await get_tree().create_timer(delay).timeout
+	# --shot-seq N：连拍 N 帧，用来量化画面抖动（比如体积雾闪烁）
+	var seq := 0
+	for i in args.size():
+		if args[i] == "--shot-seq" and i + 1 < args.size():
+			seq = int(args[i + 1])
+	if seq > 1:
+		for k in seq:
+			await RenderingServer.frame_post_draw
+			var im := get_viewport().get_texture().get_image()
+			im.save_png(path.replace(".png", "_%02d.png" % k))
+		print("SHOT_SEQ_SAVED %d" % seq)
+		get_tree().quit(0)
+		return
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	var err := img.save_png(path)
