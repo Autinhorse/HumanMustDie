@@ -98,8 +98,11 @@ PARAMS = {
         # 没有石缘（Kerb）—— 板子直接坐在地面上，金框外沿就是格子边
         "gold_outer":       0.500,  # 金框外沿 = 半个格子，正好顶到格子边，别超
         "gold_inner":       0.400,  # 金框内沿；两者之差 = 金框宽度（现 0.100）
-        "gold_top":         0.039,  # 金框高度（一级）。压得很矮，铆钉才明显高出一截
-        "gold_top_step":    0.004,  # 每级加高多少
+        # 金框高度不再单独给，而是**跟着内板走**：gold_top = plate_top + 这个值。
+        # 写死一个绝对高度的话，一抬 plate_top 金框就框不住叠层，
+        # 底座的侧壁会直接露在金框外面（v0.0.50 就是这么出的问题）。
+        "gold_above_plate": 0.014,  # 金框比内板高出多少（一级）
+        "gold_above_step":  0.004,  # 每级再高多少
         "goldline_width":   0.016,  # 二级起，金框外侧那道暗金细线的宽度
 
         # 四角铆钉：正方形，外沿和金框外沿齐平（也就是正好占住格子的四个角）
@@ -526,7 +529,8 @@ def bracket_pts(outer, size, cut, sx, sy):
     return pts
 
 
-def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material, bevel=0.005):
+def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material, bevel=0.005,
+          z0=0.0):
     """四角的方形铆钉 Bolt + 顶上一颗八角钉帽 BoltT。
 
     钉帽居中放在正方形的中心（不是放在格子角上），半径 size*cap_ratio。
@@ -536,8 +540,8 @@ def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material, be
     c = outer - size * 0.5          # 正方形的中心到原点的距离
     for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
         prism("%s%d" % (name, i), bracket_pts(outer, size, cut, sx, sy),
-              0.0, body_h, material, parent, bevel=bevel)
-        cyl("%sT%d" % (name, i), (sx * c, sy * c, body_h + cap_h * 0.5),
+              z0, z0 + body_h, material, parent, bevel=bevel)
+        cyl("%sT%d" % (name, i), (sx * c, sy * c, z0 + body_h + cap_h * 0.5),
             size * cap_ratio, cap_h, material, parent,
             sides=8, rot_z=math.radians(22.5))
 
@@ -566,15 +570,18 @@ def floor_frame(frame):
       Bolt      四角的**方形**铆钉，外角贴着格子角，朝内的角切斜角
                 （BoltT 是它顶上的收口）
     """
-    gold_h = tier_val(fp("gold_top"), fp("gold_top_step"))
+    # 金框从地面一直做到内板之上 —— 它要把整个叠层（底座 + 内板）都包住
+    gold_h = fp("plate_top") + tier_val(fp("gold_above_plate"), fp("gold_above_step"))
     ring("Gold", frame, fp("gold_outer"), fp("gold_inner"), 0.0, gold_h, "board_gold")
     if _tier >= 2:
         ring("GoldLine", frame, fp("gold_inner") + fp("goldline_width"), fp("gold_inner"),
              0.0, gold_h + 0.010, "board_gold_dark")
+    # 铆钉坐在金框**顶面**上。以前金框矮、铆钉从地面起还能露出来；
+    # 金框加高以后再从地面起就整颗埋进去了。
     bolts("Bolt", frame, fp("gold_outer"),
           tier_val(fp("bolt_size"), fp("bolt_size_step")), fp("bolt_cut"),
           fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_ratio"), "board_gold",
-          bevel=fp("bolt_bevel"))
+          bevel=fp("bolt_bevel"), z0=gold_h)
 
 
 def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.25):
