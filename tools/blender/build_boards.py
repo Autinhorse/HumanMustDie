@@ -143,13 +143,14 @@ PARAMS = {
                                     # 现在和中间十字条同宽（cross_half × 2 = 0.096），
                                     # 四个洞因此往内收，边框看着和十字一样粗
         "cross_half":       0.048,  # 十字隔条的半宽
-        "cap_height":       0.055,  # 锥体高度。**不再等于槽深** —— 想让刺显得尖，
-                                    # 锥体就得比槽深，多出来的部分静止时埋在底座里
-        "cap_fill":         0.58,   # 锥体宽度 ÷ 槽口宽度。
-                                    # 给到 0.8 会把槽底的深色全盖住，看着就是四块平方片
-        "shaft_fill":       0.80,   # 刺杆宽度 ÷ 锥体底宽
-        "shaft_len":        0.220,  # 刺杆长度，决定弹出来以后刺有多长
-        "tip_below_plate":  0.002,  # 静止时刺尖比内板低多少。保证「不突出」
+        "hole_bottom":      0.002,  # 方竖井的井底高度。压到 0 附近就行 ——
+                                    # 游戏里 y=0 以下会被地板挡住，可见井深最多
+                                    # 就是 plate_top，想要更深的井得把 plate_top 抬高
+        "cap_height":       0.055,  # 锥尖的高度
+        "spike_fill":       0.72,   # 刺的宽度 ÷ 井口宽度。留出的缝正好露出井壁
+        "spike_len":        0.320,  # 刺的**总长**（锥尖 + 刺杆）。
+                                    # 决定扎出来能有多长，也就是井要多深才装得下
+        "tip_below_plate":  0.002,  # 静止时刺尖比板面低多少。保证「不突出」
     },
 
     # ---------------- 弹簧板 ----------------
@@ -622,13 +623,18 @@ def build_spikes(root):
     """尖刺板。部件：
 
       固定（Frame）  Gold / Groove / Bolt  外框
-                     Base        底座，比内板略深的灰，顶面就是槽底
                      Plate       浅灰内板，**一整块**带四个方洞的板
-      活动（Mover）  Spike       锥体刺尖（等级色）
-                     SpikeShaft  刺杆，静止时整根藏在砖体里
+                     Base        底座，开着**同样的四个洞**，把方竖井继续往下开
+                     BaseFloor   井底，实心，封住下面并挡住刺的下半截
+      活动（Mover）  Spike       锥尖（等级色）
+                     SpikeShaft  长刺杆，从锥尖一直往下，静止时填满可见的那段井
 
-    三个等级槽形完全一样，只有刺的颜色不同。
+    洞是**贯穿下去的方竖井**，刺是长的，平时整根待在井里，触发时向上扎出。
+    三个等级井形完全一样，只有刺的颜色不同。
     静止姿态就是导出的姿态：刺尖比板面低 tip_below_plate，不突出。
+
+    井深受引擎限制：游戏里 y=0 以下会被地板挡住，所以可见井深最多就是
+    plate_top。想要更深的井，只能把 plate_top 抬高。
     """
     P = PARAMS["spikes"]
     frame = joint("Frame", (0, 0, 0), root)
@@ -637,34 +643,38 @@ def build_spikes(root):
 
     inner = fp("gold_inner") - P["plate_inset"]
     top = fp("plate_top")
-    bottom = top - P["plate_thick"]   # 板底 = 底座顶面 = 槽底
-    # 底座：顶面就是槽底，按**金框内沿**铺满，连凹槽底下也垫上。
-    # 顶面不能沉到 z=0 以下 —— 游戏里地面以下会被地板挡住，
-    # 那样从洞里看到的就是游戏地板而不是底座。
-    box("Base", (0, 0, bottom - P["base_depth"] * 0.5),
-        (fp("gold_inner") * 2, fp("gold_inner") * 2, P["base_depth"]), "board_base", frame)
+    bottom = top - P["plate_thick"]   # 板底
+    floor_z = P["hole_bottom"]        # 井底
 
-    # 内板：一整块带四个方洞的板。拿外圈 + 十字拼的话，每块都会被倒角修出一圈棱，
-    # 板面上就会看到分界线。
     div = P["cross_half"]
     rim = P["plate_rim"]
     edge = inner - rim
     xs = [-inner, -edge, -div, div, edge, inner]
-    slab_with_holes("Plate", xs, xs, [(1, 1), (1, 3), (3, 1), (3, 3)],
-                    bottom, top, "board_plate", frame)
+    holes = [(1, 1), (1, 3), (3, 1), (3, 3)]
 
-    hole_w = edge - div              # 一个方槽的**全宽**
-    d = div + hole_w * 0.5           # 槽中心距原点
+    # 内板和底座用**同一个洞网格**，方竖井就这么一路开到井底。
+    # 拿外圈 + 十字拼的话每块都会被倒角修出一圈棱，板面上会看到分界线，
+    # 所以两层都用 slab_with_holes 做成单个网格。
+    slab_with_holes("Plate", xs, xs, holes, bottom, top, "board_plate", frame)
+    slab_with_holes("Base", xs, xs, holes, floor_z, bottom, "board_base", frame)
+    # 井底：实心，封住下面，同时把刺的下半截挡住
+    box("BaseFloor", (0, 0, floor_z - P["base_depth"] * 0.5),
+        (inner * 2, inner * 2, P["base_depth"]), "board_base", frame)
 
-    cap_w = hole_w * P["cap_fill"]
+    hole_w = edge - div              # 方竖井的**全宽**
+    d = div + hole_w * 0.5           # 井心距原点
+
+    # 刺：锥尖 + 长刺杆。静止时锥尖齐板面，刺杆填满可见的那段井，
+    # 剩下的部分伸到井底以下（被 BaseFloor 挡住）。
+    spike_w = hole_w * P["spike_fill"]
     tip = top - P["tip_below_plate"]
-    cap_h = P["cap_height"]          # 锥体比槽深，底端埋进底座里，露出来的部分就尖
-    base_z = tip - cap_h
+    cap_h = P["cap_height"]
+    cone_base = tip - cap_h          # 锥尖底面 = 刺杆顶面
+    shaft_len = P["spike_len"] - cap_h
     for i, (sx, sy) in enumerate(((d, d), (-d, d), (d, -d), (-d, -d))):
-        box("SpikeShaft%d" % i, (sx, sy, base_z - P["shaft_len"] * 0.5 + 0.004),
-            (cap_w * P["shaft_fill"], cap_w * P["shaft_fill"], P["shaft_len"]),
-            "board_accent", mover)
-        pyramid("Spike%d" % i, (sx, sy, base_z), cap_w, cap_h, "board_accent", mover)
+        box("SpikeShaft%d" % i, (sx, sy, cone_base - shaft_len * 0.5),
+            (spike_w, spike_w, shaft_len), "board_accent", mover)
+        pyramid("Spike%d" % i, (sx, sy, cone_base), spike_w, cap_h, "board_accent", mover)
     return root
 
 
