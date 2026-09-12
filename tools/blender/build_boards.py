@@ -194,12 +194,11 @@ PARAMS = {
     # 弹出侧（-Y）有一条结构：深槽 Channel + 发光条 Glow + 两端螺栓 ChBolt。
     # 板子 Plate 绕这条结构的外沿翻起，箭头 Arrow 平嵌在板面里。
     "spring": {
-        "axle_from_edge":   0.075,  # 轴（= 铰链）中心离内区边缘多远
-        # 蓝轴在上、黑轴在下，整对放在板边和金框之间的空档里。
-        # 放在铰链线上的话会被板压掉一半，黑轴更是整根藏在板下面。
-        "glow_r_fill":      0.33,   # 发光轴半径 ÷ 板厚。顶面和板面齐平
-        "axle_r_fill":      0.22,   # 黑轴的厚度 ÷ 板厚。它是一条比蓝轴宽的暗色轴，
-                                    # 蓝轴压在它上面，两侧露出黑边
+        "axle_from_edge":   0.130,  # 板边离内区边缘多远（= 空档宽度）。
+                                    # 要塞得下两根并排的轴 + 板的遮挡带
+        # 两根轴**并排**放在板边和金框之间的空档里：暗色轴靠板那侧、发光轴靠外侧。
+        # 上下叠是不行的 —— 下面那根会被上面那根完全挡住（试过两次）。
+        "rod_r_fill":       0.46,   # 轴半径 ÷ 板厚。两根并排，总宽 4r 要塞进空档
         "plate_below_gold": 0.001,  # 板顶比金框顶低多少
         "channel_w":        0.620,  # 凹槽宽度（x 向）
         "channel_d":        0.120,  # 凹槽进深（y 向）
@@ -671,15 +670,16 @@ def build_spring(root):
     # 轴 = 铰链：一根暗色的轴贯通内区（两端露出来），蓝色发光套筒套在它中段。
     # 板的边就连在这根轴上，绕它翻起。
     ch_y = inner - P["axle_from_edge"]
-    gr = P["plate_thick"] * P["glow_r_fill"]
-    ar = P["plate_thick"] * P["axle_r_fill"]
-    # 黑轴要**比蓝轴宽**，蓝轴压在它上面，两侧才露得出黑边。
-    # 做成和蓝轴一样细、又摆在它正下方的话，俯视时会被完全挡住；
-    # 贴着板边摆也不行 —— 板比它高，从板那一侧看过来整根都被挡住。
-    gap_c = (ch_y + inner) * 0.5              # 板边到金框内沿之间的空档中心
-    box("Axle", (0, gap_c, bed_top + ar * 0.5), (inner * 2, inner - ch_y, ar),
-        "board_recess", frame)
-    cyl("Glow", (0, gap_c, bed_top + ar + gr), gr, P["channel_w"],
+    r = P["plate_thick"] * P["rod_r_fill"]
+    # 两根并排的圆轴：暗色的在里（挨着板边），发光的在外。
+    # 高度一样，都贴着底板躺着，顶面刚好够不到板面。
+    rod_z = bed_top + r
+    # 45° 俯视下，板在自己身后会投出约等于板厚的一条遮挡带，落在带里的东西
+    # 从板那一侧完全看不见。所以两根轴要让开这一段再摆。
+    rod0 = ch_y + P["plate_thick"] + r
+    cyl("Axle", (0, rod0, rod_z), r, inner * 2,
+        "board_recess", frame, axis="x", sides=14)
+    cyl("Glow", (0, rod0 + r * 2.0, rod_z), r, P["channel_w"],
         "board_accent", frame, axis="x", sides=16)
     # 两端不再单独放螺栓：那两颗以前是八角柱，和新的方形角铆钉撞在一起，
     # 而且位置本来就和角铆钉重叠 —— 角铆钉已经起到那个作用了。
