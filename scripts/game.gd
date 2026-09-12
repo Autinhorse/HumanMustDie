@@ -31,6 +31,32 @@ var paused: bool = false
 var sim_speed: float = 1.0
 var speed_index: int = 1
 var sim_time: float = 0.0
+
+## 表现层事件队列。模拟只管往里塞，main.gd 每帧取走交给 Fx。
+## 这样加特效不会动到定点步进的结果，无头测试也不用建粒子。
+var fx_queue: Array[Dictionary] = []
+## 命中顿帧：只影响 _process 的推进节奏，step_sim 本身不受影响
+var hitstop: float = 0.0
+
+func fx(kind: String, pos: Vector3, dir: Vector3, color: Color, power: float) -> void:
+	if fx_queue.size() >= 192:        # 一波怪同时死的时候别把内存吃穿
+		return
+	fx_queue.append({"kind": kind, "pos": pos, "dir": dir, "color": color, "power": power})
+
+func add_hitstop(seconds: float) -> void:
+	hitstop = max(hitstop, seconds)
+
+## 火花用打中它的那个机关的颜色 —— 一眼看出这一下是谁打的，
+## 连锁击杀的时候尤其重要（文档 §19 的卖点就是连锁）。
+func source_color(source: String) -> Color:
+	var d: Dictionary = Cfg.traps.get(source, {})
+	if d.is_empty():
+		return Color(0.95, 0.86, 0.62)      # 撞击、坠落这类没有机关来源
+	return Cfg.to_color(d.get("color"), Color(0.95, 0.86, 0.62))
+
+var dust_color: Color:
+	get:
+		return Cfg.to_color(Cfg.art.get("fx", {}).get("dust_color"), Color(0.82, 0.79, 0.72))
 # 由 main.gd 随相机缩放更新：单位放大倍率、地面标记强度（0~1）
 var view_unit_scale: float = 1.0
 var view_marker: float = 0.0
@@ -203,6 +229,10 @@ func _process(delta: float) -> void:
 		stats.prep_timer += delta
 		return
 	if phase != Phase.COMBAT:
+		return
+	if hitstop > 0.0:
+		# 顿帧：画面还在跑（粒子、抖动照常），只是模拟停一下，打击才有"咬合感"
+		hitstop -= delta
 		return
 	_acc += delta * sim_speed
 	var steps := 0

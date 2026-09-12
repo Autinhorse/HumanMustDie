@@ -104,6 +104,10 @@ func take_damage(amount: float, source: String, cause: String = "kill") -> float
 	_refresh_tint()
 	if hp <= 0.0:
 		die(cause, source)
+	else:
+		var f: float = clampf(dealt / max(max_hp * 0.35, 0.001), 0.2, 1.0)
+		game.fx("hit", position + Vector3(0, height * 0.55, 0), Vector3.ZERO,
+			game.source_color(source), f)
 	return dealt
 
 func apply_slow(factor: float, duration: float, source: String) -> void:
@@ -136,6 +140,9 @@ func apply_impulse(dir: Vector3, force: float, up: float, source: String) -> voi
 	_landed = false
 	last_impulse_time = game.sim_time
 	game.stats.add_displacement(source)
+	game.fx("launch", position + Vector3(0, height * 0.3, 0), vel.normalized(),
+		game.source_color(source), clampf(v / 14.0, 0.3, 1.0))
+	game.add_hitstop(Cfg.dget(Cfg.art.get("fx", {}).get("launch", {}), "hitstop", 0.0))
 
 func die(cause: String, source: String) -> void:
 	if state == State.DEAD:
@@ -143,6 +150,8 @@ func die(cause: String, source: String) -> void:
 	state = State.DEAD
 	dead_cause = cause
 	dead_source = source
+	game.fx("death", position + Vector3(0, height * 0.5, 0), Vector3.ZERO, _base_color, 1.0)
+	game.add_hitstop(Cfg.dget(Cfg.art.get("fx", {}).get("death", {}), "hitstop", 0.0))
 
 # ---------------------------------------------------------------- 每步推进
 
@@ -238,6 +247,7 @@ func _step_thrown(dt: float) -> void:
 		# 空地：下面是镂空的，开始坠落
 		state = State.FALLING
 		game.stats.add_fall_entered()
+		game.fx("fall", position, Vector3.DOWN, game.dust_color, 1.0)
 		return
 
 	# 落到地面：先结算落地伤害，然后带摩擦滑行（滑行途中依然可能滑出边缘掉下去）
@@ -246,6 +256,8 @@ func _step_thrown(dt: float) -> void:
 	if not _landed:
 		_landed = true
 		var land_speed := speed_h()
+		game.fx("land", position, Vector3.ZERO, game.dust_color,
+			clampf(land_speed / 12.0, 0.2, 1.0))
 		if land_speed > game.c_landing_speed_threshold:
 			var dmg: float = (land_speed - game.c_landing_speed_threshold) * mass * game.c_landing_damage_coef
 			take_damage(dmg, last_impulse_by if last_impulse_by != "" else "impact")

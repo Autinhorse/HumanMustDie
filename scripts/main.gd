@@ -15,6 +15,7 @@ var _ortho_size := 46.0
 var _backdrop: MeshInstance3D = null
 var _clouds: Array[MeshInstance3D] = []
 var _outline: MeshInstance3D = null
+var fx: Fx = null
 
 var pending_trap_id: String = ""
 var pending_facing := Vector2i(0, -1)
@@ -32,6 +33,11 @@ func _ready() -> void:
 	game.name = "Game"
 	add_child(game)
 	game.start(_level_from_cmdline())
+
+	fx = Fx.new()
+	fx.name = "Fx"
+	fx.setup(Cfg.art.get("fx", {}))
+	add_child(fx)
 
 	board = BoardView.new()
 	add_child(board)
@@ -348,7 +354,27 @@ func _update_camera() -> void:
 func _process(delta: float) -> void:
 	_handle_camera_pan(delta)
 	_update_hover()
+	_drain_fx()
+	_update_camera_shake()
 	hud.refresh()
+
+## 模拟排的队，这里才真的放出来
+func _drain_fx() -> void:
+	if fx == null or game == null:
+		return
+	for e in game.fx_queue:
+		fx.burst(String(e["kind"]), e["pos"], e["dir"], e["color"], float(e["power"]))
+	game.fx_queue.clear()
+
+## 抖动加在相机的局部位移上，不动 pivot，免得干扰拾取用的射线原点计算
+func _update_camera_shake() -> void:
+	if fx == null or cam == null:
+		return
+	var pitch := deg_to_rad(_pitch)
+	var base := Vector3(0.0, -sin(pitch) * _dist, cos(pitch) * _dist)
+	var o := fx.shake_offset()
+	# 正交相机下抖动幅度要按可视范围缩放，不然拉远了等于没抖
+	cam.position = base + cam.basis * (o * _ortho_size * 0.01)
 
 func _handle_camera_pan(delta: float) -> void:
 	var dir := Vector2.ZERO
@@ -529,6 +555,8 @@ func _update_zoom_readability() -> void:
 	var ms := float(cfg.get("marker_start", 30.0))
 	var mf := float(cfg.get("marker_full", 60.0))
 	game.view_marker = clampf((_ortho_size - ms) / max(mf - ms, 0.001), 0.0, 1.0)
+	if fx != null:
+		fx.zoom_scale = lerpf(1.0, float(cfg.get("fx_scale_max", 3.0)), t)
 	_update_outline_fade()
 
 ## 描边是固定像素宽的，拉远时单位只有二十来像素高，线一夹主体就糊了。

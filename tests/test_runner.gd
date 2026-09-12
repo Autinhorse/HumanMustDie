@@ -30,6 +30,12 @@ func _run_scene_test() -> void:
 	var errs := PackedStringArray()
 	var m = load("res://scenes/main.tscn").instantiate()
 	add_child(m)
+	# main.gd 有语法错时脚本会整个挂不上，节点退化成裸 Node3D，
+	# 后面的断言全被跳过还报"通过" —— 先把这种情况揪出来
+	if m.get_script() == null or not m.has_method("switch_level"):
+		_check(false, "main.tscn 的脚本没挂上（多半是 main.gd 解析失败，看上面的报错）", errs)
+		_run_result("T5 场景启动、鼠标拾取与界面回调", errs)
+		return
 	m.switch_level("corridor_01")      # 默认关卡可配，这里的坐标断言只对走廊关成立
 	if m.game.load_error != "":
 		errs.append(m.game.load_error)

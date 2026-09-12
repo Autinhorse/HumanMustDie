@@ -89,7 +89,14 @@
   "trigger":      { "type": "threshold_count", "min_count": 2, "max_wait": 2.0, "cooldown": 3.0 },
   "payload":      { "damage": 6 },       // 也支持 "dps"（持续触发按 dt 结算）
   "displacement": { "force": 9.0, "up": 0.18 },
-  "status":       {}                     // 支持 { "slow": 0.45, "duration": 1.0 }
+  "status":       {},                    // 支持 { "slow": 0.45, "duration": 1.0 }
+
+  "model": "trap_push_wall",             // assets/models/ 下的 glb，不填就退回色块
+  "anim": {                              // 触发动作，见 §6.8
+    "part": "Ram", "type": "slide", "axis": [0, 0, -1],
+    "rest": 0.0, "fire": 0.42,
+    "attack": 0.07, "hold": 0.14, "release": 0.45
+  }
 }
 ```
 
@@ -139,13 +146,19 @@ scripts/
   trap.gd              机关实例，按五段组件执行
   traps/{trigger,targeting,payload,displacement,status}.gd
   stats.gd             战斗数据记录与导出
-  view/board_view.gd   灰盒地图占位方块
+  view/board_view.gd   合并成一个 ArrayMesh 的地块，带顶点 AO
+  view/actor_view.gd   敌人模型与程序化跑/倒地动作
+  view/trap_view.gd    机关模型与触发动作
+  view/fx.gd           打击表现：火花、尘土、镜头抖动
   view/preview.gd      覆盖范围与朝向预览
   ui/hud.gd            界面
   main.gd              相机、输入、放置流程
 tests/
-  test_runner.gd       无头自动化测试（T0–T5）
-  demo.gd              自动搭杀戮区的演示场景
+  test_runner.gd       无头自动化测试（T0–T7）
+  demo.gd              自动搭杀戮区的演示场景（沿路径自动摆机关）
+  pose.tscn            敌人动作检查图
+  trap_pose.tscn       机关模型检查图（静止/触发两排）
+  fx_pose.tscn         打击特效检查图
 ```
 
 逻辑与表现分离：`grid/flow_field/game/enemy/trap` 完全不依赖任何视觉节点，位移由游戏逻辑驱动而非刚体，因此同种子同操作可复现（§15.3）。
@@ -373,6 +386,92 @@ Godot_v4.7-stable_win64.exe --path . res://tests/pose.tscn -- --shot D:/poses.pn
       --yaw 90            侧视，判断前倾和剑的倾角必须用它
       --facings           八个朝向排开，检查道具在各朝向是否一致
 ```
+
+## 6.8 机关模型与触发动作（v0.0.31 起）
+
+五种机关不再是色块，换成 `tools/blender/build_traps.py` 程序化生成的模型。
+和角色一样**不做骨骼**：模型里的活动部件单独命名，Godot 直接给那个节点改
+transform 就是动作。
+
+```
+地刺   Spikes   slide   上下伸缩
+黏胶   Surface  bob     轻微起伏（待机，不用触发）
+弹射板 Plate    rotate  绕铰链翻起
+推墙   Ram      slide   沿朝向推出
+锯墙   Blade    spin    持续旋转（待机）
+```
+
+建模约定（和角色一致）：
+- 按 **1×1 格**建，Godot 里按 `cell_size` 缩放；
+- 朝 **+Y**，glTF 转 Y-up 后就是 Godot 的前方 −Z；
+- 墙面机关原点在墙面上，本体往朝向伸出；
+- 材质 `trap_primary` 会按 `traps.json` 的 `color` 换色，其余（金属、黄铜、
+  刃、黏胶）固定。**每种机关都要留出足够的 primary 面**，否则拉远以后
+  五种机关长得一样，分不出类型。
+
+`anim` 的三段式触发：`attack` 弹出 → `hold` 停留 → `release` 收回，
+`spin` / `bob` 两种是待机动作，不看触发。
+
+改了模型以后要重新导出并让 Godot 重新导入：
+
+```
+blender --background --python tools/blender/build_traps.py -- --out assets/models
+Godot_v4.7-stable_win64_console.exe --headless --editor --quit --path .
+```
+
+第二步不能省 —— 非编辑器模式不会重新导入 glb，游戏里会一直用旧模型。
+
+检查图：`res://tests/trap_pose.tscn -- --shot out.png [--ortho 10] [--fire 0.1]`，
+五种机关静止/触发两排并列，按游戏的格子尺寸和 45° 俯角摆。
+
+### 这一轮踩到的
+- **弹射板往地里钻**：绕 Godot **+X** 转，正角度才把前方 −Z 抬向 +Y，
+  配置里写成负的就翻反了。glTF 的 Y-up 转换每次都容易搞错轴向，
+  T7 就是专门防这个的：断言触发后部件 transform 确实变了。
+- **推墙看着像个盒子**：缓冲垫铺满了整个撞头正面，识别色只剩顶上一条；
+  撞头还浮在机箱外 0.3，中间空一段。改成缓冲垫只做上下两条、
+  撞头静止时贴着机箱，推出去才露出活塞杆。
+- **demo 一个机关都摆不出来**：`demo.gd` 里写死的是 `corridor_01` 的坐标，
+  换关卡以后全部落空，等于一直在空场景上调美术。现在改成沿入口→核心的
+  路径自动摆。
+
+## 6.9 打击表现（v0.0.32 起）
+
+`view/fx.gd`：火花、尘土、死亡爆散 + 镜头抖动 + 命中顿帧。参数全在
+`art.json` 的 `fx` 段。
+
+**模拟层不建粒子。** `Game` 只往 `fx_queue` 里塞事件，`main.gd` 每帧取走交给
+`Fx`。这样无头测试跑的还是纯逻辑，表现层加什么都不会动到定点步进的结果
+（§15.3 的可复现要求）。
+
+五种效果和触发点：
+
+| 效果 | 触发 | 颜色 |
+|---|---|---|
+| `hit` | `take_damage` 没打死 | **打中它的那个机关的颜色** |
+| `launch` | `apply_impulse` 真的把人击飞了 | 机关颜色 |
+| `land` | 击飞后落地 | 尘土色 |
+| `death` | `die` | 敌人自己的颜色 |
+| `fall` | 掉进坑里 | 尘土色 |
+
+火花用机关色是有意的：文档 §19 的卖点是连锁击杀，一眼看出这一下是谁打的，
+连锁才读得出来。
+
+顿帧只改 `_process` 的推进节奏，`step_sim` 本身不受影响，所以测试不受干扰。
+
+检查图：`res://tests/fx_pose.tscn -- --shot out.png --at 0.2 --ortho 46`。
+**`--ortho` 一定要按游戏里的实际可视高度给**（默认 46），否则调出来的大小到
+游戏里完全不是一回事 —— 见下面。
+
+### 这一轮踩到的
+- **粒子大了十几倍**：Godot 的 billboard 会重建基向量，把每颗粒子的缩放一起
+  丢掉，结果全部按网格原始尺寸画。反正是固定角度的正交相机，直接关掉
+  billboard 就好。
+- **调好了到游戏里看不见**：检查场景当时是 ortho 7.8，游戏里是 46，差六倍。
+  粒子比单位还小一个量级，所以跟着 `zoom_readability` 一起放大
+  （新增 `fx_scale_max`），尺寸和初速一起放大 —— 只放大尺寸会挤成一坨不散开。
+- **T5 明明挂了却报"通过"**：`main.gd` 有语法错时脚本整个挂不上，节点退化成
+  裸 `Node3D`，后面的断言全被跳过。现在 T5 先检查脚本挂没挂上。
 
 ## 7. 已知问题 / 下一步
 

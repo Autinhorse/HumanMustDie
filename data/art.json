@@ -1,28 +1,34 @@
 {
   "_comment": "美术参数。风格参考 ref/Arrow 05.jpg（Isle of Arrows）。tools/blender/build_island.py 里的 STYLE 用的是同一套值，两边要一起改。",
-
   "palette": {
     "_comment": "地面顶面三档色差，避免大片死白；侧面统一灰岩",
-    "floor_top":   ["#EFEBE1", "#E6E0D3", "#D8D1C2"],
-    "floor_top_weights": [0.78, 0.15, 0.07],
-    "floor_side":  "#9A948A",
-    "bridge_top":  "#D2BE9A",
+    "floor_top": [
+      "#EFEBE1",
+      "#E6E0D3",
+      "#D8D1C2"
+    ],
+    "floor_top_weights": [
+      0.78,
+      0.15,
+      0.07
+    ],
+    "floor_side": "#9A948A",
+    "bridge_top": "#D2BE9A",
     "bridge_side": "#9A948A",
-    "wall_top":    "#F5F2EB",
-    "wall_side":   "#C6C0B4",
-    "obstacle_top":  "#8A8079",
+    "wall_top": "#F5F2EB",
+    "wall_side": "#C6C0B4",
+    "obstacle_top": "#8A8079",
     "obstacle_side": "#6E645D",
-    "rock_top":    "#8C7E72",
-    "rock_deep":   "#6B5C52",
-    "core_rim":    "#F0ECE2",
-    "grid_line":   "#BDB3A0",
-    "core_water":  "#3FB3B0",
-    "entrance":    "#D4825F",
-    "cloud":       "#E4EFEE",
-    "cloud_top":   "#FFFFFF",
+    "rock_top": "#8C7E72",
+    "rock_deep": "#6B5C52",
+    "core_rim": "#F0ECE2",
+    "grid_line": "#BDB3A0",
+    "core_water": "#3FB3B0",
+    "entrance": "#D4825F",
+    "cloud": "#E4EFEE",
+    "cloud_top": "#FFFFFF",
     "cloud_bottom": "#B9CFD1"
   },
-
   "rock": {
     "_comment": "岛底岩柱：程序化生成，跟着地图走。同种子同地图=同一座岛",
     "seed": 20260911,
@@ -38,7 +44,6 @@
     "skip_chance": 0.22,
     "top_scale_min": 0.62
   },
-
   "clouds": {
     "_comment": "背景柔边薄雾。alpha 越低越接近天空；softness 越小边缘越虚；width 是相对画面高度的比例",
     "enabled": true,
@@ -50,7 +55,6 @@
     "aspect_min": 2.4,
     "aspect_max": 4.5
   },
-
   "anim": {
     "_comment": "跑步动作与配色。shade_darken 是腿/护手相对主色暗多少。相位由走过的距离驱动，所以 stride_ratio 越大步子越大、一个循环耗时越久；其余是各部件的摆动/前倾角度。",
     "leg_swing_deg": 57.0,
@@ -61,19 +65,19 @@
     "bob_height": 0.06,
     "stride_ratio": 0.715,
     "shade_darken": 0.42,
-
     "per_model": {
       "_comment": "按模型覆盖上面的动作参数。lock_arms 里的手臂保持模型自带的静止姿势，不参与摆动。",
       "shieldman": {
         "torso_lean_deg": 7.0,
         "head_lean_deg": 2.0,
-        "lock_arms": ["ArmL"]
+        "lock_arms": [
+          "ArmL"
+        ]
       }
     }
   },
-
   "zoom_readability": {
-    "_comment": "拉远时敌人会变成几个像素，这里按正交可视高度自动补偿：单位放大 + 地面标记淡入。base_ortho 是不做补偿的基准高度。",
+    "_comment": "拉远时敌人只剩几个像素，这里按相机可视高度自动补偿：单位放大 + 地面标记淡入 + 粒子放大。base_ortho 是不做补偿的基准高度，fx_scale_max 是粒子在最远处的放大倍数。",
     "enabled": true,
     "base_ortho": 26.0,
     "unit_scale_max": 1.7,
@@ -81,9 +85,9 @@
     "marker_start": 30.0,
     "marker_full": 60.0,
     "marker_alpha": 0.72,
-    "marker_radius_mul": 1.5
+    "marker_radius_mul": 1.5,
+    "fx_scale_max": 3.0
   },
-
   "under_clouds": {
     "_comment": "岛下方的体积云（FogVolume）。density 是浓度，edge_fade 是边缘虚化，flatten 是压扁程度。云铺在岛的投影范围内（含一圈外扩），坑里和岛缘看到的都是它。",
     "enabled": true,
@@ -100,7 +104,6 @@
     "color": "#DCE6E8",
     "_alpha_unused": 1.0
   },
-
   "core_fx": {
     "_comment": "核心是全局焦点，让它缓慢呼吸。pulse 是发光强度起伏，bob 是水面上下浮动。",
     "pulse_speed": 1.1,
@@ -108,9 +111,8 @@
     "bob_speed": 0.9,
     "bob_amount": 0.022
   },
-
   "environment": {
-    "sky_top":     "#6B8C91",
+    "sky_top": "#6B8C91",
     "sky_horizon": "#A6C1C0",
     "ground_horizon": "#8FA9A8",
     "ground_bottom": "#6E8A89",
@@ -119,13 +121,11 @@
     "tonemap": "filmic",
     "exposure": 0.88,
     "white": 1.0,
-
     "fog_enabled": true,
     "fog_color": "#C3D2D8",
     "fog_density": 0.0018,
     "fog_sky_affect": 0.0,
     "fog_aerial_perspective": 0.32,
-
     "volumetric_enabled": true,
     "volumetric_density": 0.0,
     "volumetric_albedo": "#FFFFFF",
@@ -136,12 +136,10 @@
     "volumetric_temporal_reprojection": false,
     "volumetric_temporal_amount": 0.9,
     "sun_volumetric_energy": 4.5,
-
     "ssao_enabled": true,
     "ssao_radius": 1.0,
     "ssao_intensity": 2.6,
     "ssao_power": 2.0,
-
     "sun_color": "#FFF7E9",
     "sun_energy": 0.92,
     "sun_elevation_deg": 42.0,
@@ -150,23 +148,19 @@
     "shadow_blur": 0.8,
     "fill_color": "#AFC0D6",
     "fill_energy": 0.12,
-
     "rim_color": "#C6D4E2",
     "rim_energy": 0.55,
     "rim_elevation_deg": 10.0,
     "rim_azimuth_offset_deg": 155.0,
-
     "glow_enabled": true,
     "glow_intensity": 0.55,
     "glow_bloom": 0.12,
     "glow_hdr_threshold": 1.05,
     "glow_hdr_scale": 2.0,
-
     "adjust_enabled": true,
     "adjust_brightness": 1.0,
     "adjust_contrast": 1.08,
     "adjust_saturation": 1.12,
-
     "outline_enabled": false,
     "outline_color": "#4D5560",
     "outline_thickness": 1.2,
@@ -177,7 +171,6 @@
     "outline_fade_end": 52.0,
     "outline_depth_fade": 120.0
   },
-
   "board": {
     "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝。ao_* 是烘焙进顶点色的环境光遮蔽：ao_corner 管墙角、ao_side 管竖直面底部。",
     "ao_subdiv": 6,
@@ -188,5 +181,75 @@
     "tile_lift": 0.002,
     "obstacle_height_mul": 1.35,
     "bridge_thickness_mul": 0.6
+  },
+  "fx": {
+    "_comment": "打击表现。amount 粒子数，speed 初速，lifetime 存活秒，gravity 下坠，scale 粒子大小，spread 张角，shake 镜头抖动，hitstop 顿帧秒数（只有击飞和死亡有）。",
+    "pool_size": 8,
+    "shake_decay": 6.0,
+    "shake_freq": 34.0,
+    "shake_max": 0.6,
+    "dust_color": "#D2CCC0",
+    "hit": {
+      "amount": 14,
+      "speed": 6.0,
+      "lifetime": 0.32,
+      "gravity": 16.0,
+      "scale": 0.2,
+      "spread": 70.0,
+      "radius": 0.1,
+      "damping": 2.0,
+      "up_bias": 0.8,
+      "shake": 0.03
+    },
+    "launch": {
+      "amount": 14,
+      "speed": 4.5,
+      "lifetime": 0.45,
+      "gravity": 9.0,
+      "scale": 0.34,
+      "spread": 45.0,
+      "radius": 0.16,
+      "damping": 1.5,
+      "up_bias": 0.5,
+      "shake": 0.14,
+      "hitstop": 0.035
+    },
+    "land": {
+      "amount": 18,
+      "speed": 3.2,
+      "lifetime": 0.5,
+      "gravity": 3.0,
+      "scale": 0.38,
+      "spread": 88.0,
+      "radius": 0.2,
+      "damping": 3.0,
+      "up_bias": 0.15,
+      "shake": 0.06
+    },
+    "death": {
+      "amount": 20,
+      "speed": 5.5,
+      "lifetime": 0.55,
+      "gravity": 14.0,
+      "scale": 0.26,
+      "spread": 90.0,
+      "radius": 0.14,
+      "damping": 1.6,
+      "up_bias": 0.7,
+      "shake": 0.1,
+      "hitstop": 0.05
+    },
+    "fall": {
+      "amount": 10,
+      "speed": 2.6,
+      "lifetime": 0.6,
+      "gravity": -2.0,
+      "scale": 0.32,
+      "spread": 40.0,
+      "radius": 0.18,
+      "damping": 1.0,
+      "up_bias": -1.0,
+      "shake": 0.05
+    }
   }
 }
