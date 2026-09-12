@@ -106,7 +106,9 @@ PARAMS = {
         "bolt_size":        0.155,  # 正方形边长（一级）
         "bolt_size_step":   0.008,  # 每级加大多少
         "bolt_cut":         0.3333, # 朝格子内侧那个角切斜角，下刀在两条边的这个比例处
-        "bolt_body_h":      0.098,  # 铆钉主体高度。明显高过金框，两者才分得开
+        "bolt_body_h":      0.049,  # 铆钉主体高度
+        "bolt_bevel":       0.012,  # 铆钉的倒角。金框压矮以后铆钉只比它高一点点，
+                                    # 靠这个倒角做出一圈高光/暗边，才不会和金框糊在一起
         "bolt_cap_h":       0.028,  # 顶上那颗八角钉帽的高度
         "bolt_cap_ratio":   0.25,   # 钉帽半径 ÷ bolt_size。
                                     # 0.25 => 直径约等于 Bolt 边长的一半，
@@ -424,7 +426,7 @@ def bracket_pts(outer, size, cut, sx, sy):
     return pts
 
 
-def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material):
+def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material, bevel=0.005):
     """四角的方形铆钉 Bolt + 顶上一颗八角钉帽 BoltT。
 
     钉帽居中放在正方形的中心（不是放在格子角上），半径 size*cap_ratio。
@@ -434,7 +436,7 @@ def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material):
     c = outer - size * 0.5          # 正方形的中心到原点的距离
     for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
         prism("%s%d" % (name, i), bracket_pts(outer, size, cut, sx, sy),
-              0.0, body_h, material, parent, bevel=0.005)
+              0.0, body_h, material, parent, bevel=bevel)
         cyl("%sT%d" % (name, i), (sx * c, sy * c, body_h + cap_h * 0.5),
             size * cap_ratio, cap_h, material, parent,
             sides=8, rot_z=math.radians(22.5))
@@ -473,7 +475,8 @@ def floor_frame(frame):
              0.0, gold_h + 0.010, "board_gold_dark")
     bolts("Bolt", frame, fp("gold_outer"),
           tier_val(fp("bolt_size"), fp("bolt_size_step")), fp("bolt_cut"),
-          fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_ratio"), "board_gold")
+          fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_ratio"), "board_gold",
+          bevel=fp("bolt_bevel"))
 
 
 def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.25):
