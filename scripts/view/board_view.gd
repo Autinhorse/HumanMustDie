@@ -18,6 +18,8 @@ var _wall_h := 1.0
 var _obs_h := 1.35
 var _bridge_thick := 0.15
 var _line_w := 0.06
+var _ao_corner := 0.34
+var _ao_side := 0.24
 var _lift := 0.002
 var _c_floor_side := Color.GRAY
 var _c_bridge_side := Color.GRAY
@@ -43,6 +45,8 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 	_bridge_thick = _thick * float(board_cfg.get("bridge_thickness_mul", 0.6))
 	_line_w = float(board_cfg.get("grid_line_width", 0.06))
 	_lift = float(board_cfg.get("tile_lift", 0.002))
+	_ao_corner = float(board_cfg.get("ao_corner", 0.34))
+	_ao_side = float(board_cfg.get("ao_side", 0.24))
 
 	var floor_tops: Array = pal.get("floor_top", ["#DED6C4"])
 	var floor_weights: Array = pal.get("floor_top_weights", [1.0])
@@ -83,7 +87,7 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 			var ground_color: Color = bridge_top if t == HGrid.Cell.BRIDGE else _pick(floor_tops, floor_weights, rng)
 			if entrance_set.has(cell):
 				ground_color = entrance_col
-			_ground_tile(st, center, ground_color)
+			_ground_tile(st, cell, center, ground_color)
 
 			# --- 岛的轮廓：只有挨着空地（或出图）的那一面才有侧面
 			var bottom: float = -(_bridge_thick if t == HGrid.Cell.BRIDGE else _thick)
@@ -124,12 +128,35 @@ func _touches_open(cell: Vector2i) -> bool:
 	return false
 
 ## 一格地面：整格的缝色打底 + 稍微抬起、四周内缩的面色。出细缝但保持共面，不产生凸块。
-func _ground_tile(st: SurfaceTool, center: Vector3, color: Color) -> void:
+func _ground_tile(st: SurfaceTool, cell: Vector2i, center: Vector3, color: Color) -> void:
+	var ao := _corner_ao(cell)
 	if _line_w > 0.0:
-		_top_quad(st, center, _cs, 0.0, _c_line)
-		_top_quad(st, center, _cs - _line_w, _lift, color)
+		_top_quad(st, center, _cs, 0.0, _c_line, ao)
+		_top_quad(st, center, _cs - _line_w, _lift, color, ao)
 	else:
-		_top_quad(st, center, _cs, 0.0, color)
+		_top_quad(st, center, _cs, 0.0, color, ao)
+
+## 四个角各看两条边 + 一个斜角有没有挡住自己，挡得越多越暗（经典的方块地形 AO）
+func _corner_ao(cell: Vector2i) -> PackedFloat32Array:
+	if _ao_corner <= 0.0:
+		return PackedFloat32Array()
+	var out := PackedFloat32Array()
+	# 顺序要和 _top_quad 的 a/b/c/d 对上
+	for d in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, 1)]:
+		var n := 0
+		if _blocks(cell + Vector2i(d.x, 0)):
+			n += 1
+		if _blocks(cell + Vector2i(0, d.y)):
+			n += 1
+		if n < 2 and _blocks(cell + d):
+			n += 1
+		out.append(1.0 - _ao_corner * (float(n) / 3.0))
+	return out
+
+## 高出地面、会投下遮蔽的格子
+func _blocks(cell: Vector2i) -> bool:
+	var t := grid.get_cell(cell)
+	return t == HGrid.Cell.WALL or t == HGrid.Cell.OBSTACLE
 
 ## 立方块（墙/障碍）。和同类相邻的那一面不画，连成一条完整的墙。
 func _block(st: SurfaceTool, cell: Vector2i, center: Vector3, height: float,
@@ -141,11 +168,12 @@ func _block(st: SurfaceTool, cell: Vector2i, center: Vector3, height: float,
 			continue
 		_side_quad(st, center, d, height, 0.0, side_color, size)
 
-func _top_quad(st: SurfaceTool, center: Vector3, size: float, y: float, color: Color) -> void:
+func _top_quad(st: SurfaceTool, center: Vector3, size: float, y: float, color: Color,
+		ao: PackedFloat32Array = PackedFloat32Array()) -> void:
 	var h := size * 0.5
 	_quad(st,
 		center + Vector3(-h, y, -h), center + Vector3(h, y, -h),
-		center + Vector3(h, y, h), center + Vector3(-h, y, h), color)
+		center + Vector3(h, y, h), center + Vector3(-h, y, h), color, ao)
 
 ## 朝 dir 方向的一面竖直面，从 y_top 落到 y_bottom
 func _side_quad(st: SurfaceTool, center: Vector3, dir: Vector2i, y_top: float, y_bottom: float,
@@ -156,11 +184,14 @@ func _side_quad(st: SurfaceTool, center: Vector3, dir: Vector2i, y_top: float, y
 	var side := Vector3(-n.z, 0.0, n.x)
 	var edge := center + n * h
 	# 绕序从底边起，法线才朝外；反了的话整面会被当成背光面渲染成黑的
+	# 竖直面越靠下越暗：墙根和崖壁底部自然产生遮蔽感
+	var lo := 1.0 - _ao_side
 	_quad(st,
 		edge - side * h + Vector3(0, y_bottom, 0),
 		edge + side * h + Vector3(0, y_bottom, 0),
 		edge + side * h + Vector3(0, y_top, 0),
-		edge - side * h + Vector3(0, y_top, 0), color)
+		edge - side * h + Vector3(0, y_top, 0), color,
+		PackedFloat32Array([lo, lo, 1.0, 1.0]))
 
 func _rock_column(st: SurfaceTool, center: Vector3, top_y: float, rock_cfg: Dictionary,
 		rng: RandomNumberGenerator, top_color: Color, deep_color: Color) -> void:
@@ -205,10 +236,15 @@ func _rock_column(st: SurfaceTool, center: Vector3, top_y: float, rock_cfg: Dict
 	_quad(st, b2, b3, t3, t2, deep_color)
 	_quad(st, b3, b0, t0, t3, deep_color)
 
-func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color) -> void:
-	for v in [a, b, c, a, c, d]:
-		st.set_color(color)
-		st.add_vertex(v)
+## ao 传 4 个值（对应 a/b/c/d 四个角）时按顶点压暗，用来烘焙环境光遮蔽
+func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color,
+		ao: PackedFloat32Array = PackedFloat32Array()) -> void:
+	var pts := [a, b, c, d]
+	var has_ao := ao.size() == 4
+	for k in [0, 1, 2, 0, 2, 3]:
+		var f: float = ao[k] if has_ao else 1.0
+		st.set_color(Color(color.r * f, color.g * f, color.b * f, color.a))
+		st.add_vertex(pts[k])
 
 func _build_core(pal: Dictionary) -> void:
 	var cores := grid.cells_of_type(HGrid.Cell.CORE)

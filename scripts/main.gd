@@ -14,6 +14,7 @@ var _pitch := -52.0
 var _ortho_size := 46.0
 var _backdrop: MeshInstance3D = null
 var _clouds: Array[MeshInstance3D] = []
+var _outline: MeshInstance3D = null
 
 var pending_trap_id: String = ""
 var pending_facing := Vector2i(0, -1)
@@ -106,6 +107,18 @@ func _build_world() -> void:
 	fill.shadow_enabled = false
 	add_child(fill)
 
+	# 边缘光：从背后低角度打一道冷色，把物体从背景里剥出来
+	if _ec(env_cfg, "rim_energy", 0.0) > 0.0:
+		var rim := DirectionalLight3D.new()
+		rim.name = "Rim"
+		rim.rotation = Vector3(-deg_to_rad(_ec(env_cfg, "rim_elevation_deg", 12.0)),
+			azim + deg_to_rad(_ec(env_cfg, "rim_azimuth_offset_deg", 155.0)), 0.0)
+		rim.light_color = _hex(env_cfg, "rim_color", Color(0.72, 0.86, 0.95))
+		rim.light_energy = _ec(env_cfg, "rim_energy", 0.5)
+		rim.light_specular = 0.0
+		rim.shadow_enabled = false
+		add_child(rim)
+
 	_pivot = Node3D.new()
 	add_child(_pivot)
 	cam = Camera3D.new()
@@ -139,6 +152,35 @@ func _build_backdrop(env_cfg: Dictionary) -> void:
 	_backdrop.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	cam.add_child(_backdrop)
 	_build_clouds()
+	_build_outline(env_cfg)
+
+## 屏幕空间描边：一块全屏四边形挂在相机上，在所有东西画完之后覆盖一层
+func _build_outline(env_cfg: Dictionary) -> void:
+	if not bool(env_cfg.get("outline_enabled", true)):
+		return
+	var shader: Shader = load("res://assets/shaders/outline.gdshader")
+	if shader == null:
+		push_warning("描边着色器载入失败")
+		return
+	var m := ShaderMaterial.new()
+	m.shader = shader
+	m.render_priority = 100        # 保证最后画
+	m.set_shader_parameter("outline_color", _hex(env_cfg, "outline_color", Color(0.11, 0.13, 0.17)))
+	m.set_shader_parameter("thickness", _ec(env_cfg, "outline_thickness", 1.0))
+	m.set_shader_parameter("depth_threshold", _ec(env_cfg, "outline_depth_threshold", 0.045))
+	m.set_shader_parameter("normal_threshold", _ec(env_cfg, "outline_normal_threshold", 0.30))
+	m.set_shader_parameter("strength", _ec(env_cfg, "outline_strength", 0.8))
+	m.set_shader_parameter("depth_fade", _ec(env_cfg, "outline_depth_fade", 120.0))
+
+	_outline = MeshInstance3D.new()
+	_outline.name = "Outline"
+	_outline.mesh = QuadMesh.new()
+	_outline.material_override = m
+	_outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# 顶点着色器会把它拉成全屏，这里只要保证不被视锥剔除
+	_outline.extra_cull_margin = 16384.0
+	_outline.position = Vector3(0, 0, -1.0)
+	cam.add_child(_outline)
 
 ## 云：参考图里是画在背景上的柔边薄雾，不是有体积的白球。
 ## 做成跟随相机的一层宽扁柔边片，和天空只差一点亮度，永远在所有东西后面。
@@ -224,6 +266,22 @@ func _make_environment(env_cfg: Dictionary) -> Environment:
 		e.fog_density = _ec(env_cfg, "fog_density", 0.006)
 		e.fog_sky_affect = _ec(env_cfg, "fog_sky_affect", 0.0)
 		e.fog_aerial_perspective = _ec(env_cfg, "fog_aerial_perspective", 0.35)
+
+	# 辉光：只吃超过阈值的亮部（核心水面、机关高亮），不会把整张图糊掉
+	if bool(env_cfg.get("glow_enabled", true)):
+		e.glow_enabled = true
+		e.glow_intensity = _ec(env_cfg, "glow_intensity", 0.55)
+		e.glow_bloom = _ec(env_cfg, "glow_bloom", 0.12)
+		e.glow_hdr_threshold = _ec(env_cfg, "glow_hdr_threshold", 1.05)
+		e.glow_hdr_scale = _ec(env_cfg, "glow_hdr_scale", 2.0)
+		e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+
+	# 调色：出片前统一提一点对比和饱和
+	if bool(env_cfg.get("adjust_enabled", true)):
+		e.adjustment_enabled = true
+		e.adjustment_brightness = _ec(env_cfg, "adjust_brightness", 1.0)
+		e.adjustment_contrast = _ec(env_cfg, "adjust_contrast", 1.08)
+		e.adjustment_saturation = _ec(env_cfg, "adjust_saturation", 1.12)
 
 	if bool(env_cfg.get("ssao_enabled", true)):
 		e.ssao_enabled = true

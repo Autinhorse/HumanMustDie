@@ -101,11 +101,37 @@
     "sun_angular_distance_deg": 1.2,
     "shadow_blur": 0.8,
     "fill_color": "#BFD6D6",
-    "fill_energy": 0.12
+    "fill_energy": 0.12,
+
+    "rim_color": "#BCD9EA",
+    "rim_energy": 0.55,
+    "rim_elevation_deg": 10.0,
+    "rim_azimuth_offset_deg": 155.0,
+
+    "glow_enabled": true,
+    "glow_intensity": 0.55,
+    "glow_bloom": 0.12,
+    "glow_hdr_threshold": 1.05,
+    "glow_hdr_scale": 2.0,
+
+    "adjust_enabled": true,
+    "adjust_brightness": 1.0,
+    "adjust_contrast": 1.08,
+    "adjust_saturation": 1.12,
+
+    "outline_enabled": true,
+    "outline_color": "#1C2228",
+    "outline_thickness": 1.2,
+    "outline_depth_threshold": 0.08,
+    "outline_normal_threshold": 0.22,
+    "outline_strength": 0.95,
+    "outline_depth_fade": 120.0
   },
 
   "board": {
-    "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝",
+    "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝。ao_* 是烘焙进顶点色的环境光遮蔽：ao_corner 管墙角、ao_side 管竖直面底部。",
+    "ao_corner": 0.34,
+    "ao_side": 0.24,
     "grid_line_width": 0.07,
     "tile_lift": 0.002,
     "obstacle_height_mul": 1.35,
