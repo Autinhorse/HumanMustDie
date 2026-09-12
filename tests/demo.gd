@@ -11,9 +11,13 @@ func _ready() -> void:
 	if g.load_error != "":
 		return
 	if g.level_id != "corridor_01":
-		# 别的关卡坐标对不上，只开一波看地形
+		# 别的关卡写死的坐标对不上，沿路径自动摆一遍
+		g.gold = 99999
+		_auto_place(g)
+		g.gold = Cfg.int_at("economy.start_gold", 320)
 		m.hud.toggle_stats()
-		g.start_wave()
+		if not _spawn_override(g):
+			g.start_wave()
 		await _maybe_screenshot()
 		return
 	g.gold = 99999
@@ -29,6 +33,36 @@ func _ready() -> void:
 	if not _spawn_override(g):
 		g.start_wave()
 	await _maybe_screenshot()
+
+## 沿入口->核心的路径自动摆机关：写死坐标只对 corridor_01 有效，换关卡就全落空了。
+## 地面机关摆在路径格上，墙面机关摆在路径两侧的墙上、朝向路径。
+func _auto_place(g: Game) -> void:
+	var entrances := g.flow.find_entrance_cells()
+	if entrances.is_empty():
+		return
+	var ground := ["spikes", "tar", "launcher"]
+	var wall := ["push_wall", "saw"]
+	var gi := 0
+	var wi := 0
+	var c: Vector2i = entrances[0]
+	var step := 0
+	while step < 200:
+		step += 1
+		var nxt := g.flow.next_cell(c)
+		if nxt == c:
+			break
+		c = nxt
+		if step < 3:
+			continue          # 入口附近留空，不然敌人一出生就被拍死
+		if step % 2 == 0 and gi < ground.size() * 3:
+			if g.place(ground[gi % ground.size()], c, Vector2i(0, -1)):
+				gi += 1
+		if wi < wall.size() * 2:
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				# 机关装在墙格上，朝向是从墙指向路径，所以取反向
+				if g.place(wall[wi % wall.size()], c + d, -d):
+					wi += 1
+					break
 
 ## --spawn <敌人id>[:数量] 直接在入口放一批指定敌人，用来单独看某种敌人
 func _spawn_override(g: Game) -> bool:

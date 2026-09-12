@@ -11,6 +11,7 @@ var coverage: Array[Vector2i] = []
 var trigger_state: Dictionary = {"cooldown_left": 0.0}
 var game = null
 
+var view: TrapView = null
 var _mat: StandardMaterial3D = null
 var _base_color: Color = Color.WHITE
 var _flash: float = 0.0
@@ -67,11 +68,28 @@ func step(dt: float) -> void:
 	if not status.is_empty() and not enemies.is_empty():
 		game.stats.add_control(src, dt * float(enemies.size()))
 	_flash = 1.0
+	if view != null:
+		view.fire()
 
 # ---------------------------------------------------------------- 表现
 
 func _build_view() -> void:
 	var cs: float = game.grid.cell_size
+	var model_id := String(data.get("model", ""))
+	if model_id != "":
+		var v := TrapView.new()
+		add_child(v)
+		if v.setup(model_id, cs, _base_color, data.get("anim", {})):
+			view = v
+			if mount == "ground":
+				if bool(data.get("directional", false)):
+					v.rotation.y = atan2(-float(facing.x), -float(facing.y))
+			else:
+				# 墙面机关：原点挪到墙面上，模型自己往朝向伸出
+				v.position = Vector3(float(facing.x), 0.0, float(facing.y)) * (cs * 0.5)
+				v.rotation.y = atan2(-float(facing.x), -float(facing.y))
+			return
+		v.queue_free()
 	var mesh := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	_mat = StandardMaterial3D.new()
@@ -110,9 +128,13 @@ func _make_arrow(cs: float) -> MeshInstance3D:
 	return arrow
 
 func _refresh_tint() -> void:
+	var cd := cooldown_ratio()
+	if view != null:
+		# 冷却中压暗，和原来的色块表现一致
+		view.set_color(_base_color.lerp(Color(0.30, 0.30, 0.33), cd * 0.55))
+		return
 	if _mat == null:
 		return
-	var cd := cooldown_ratio()
 	var c: Color = _base_color.lerp(Color(0.16, 0.16, 0.18), cd * 0.75)
 	if _flash > 0.0:
 		c = c.lerp(Color(1, 1, 1), _flash * 0.8)

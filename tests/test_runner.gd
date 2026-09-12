@@ -15,6 +15,7 @@ func _ready() -> void:
 	_run("T3 重型只短移，且撞伤沿途小怪", _test_heavy_short_push)
 	_run("T4 完整一波跑通不崩溃", _test_full_wave)
 	_run("T6 关卡可以显式指定入口", _test_entrance_override)
+	_run("T7 机关模型与触发动作", _test_trap_view)
 	await _run_scene_test()
 
 	print("\n".join(_lines))
@@ -89,6 +90,40 @@ func _check(cond: bool, msg: String, errs: PackedStringArray) -> void:
 		errs.append(msg)
 
 # ---------------------------------------------------------------- 用例
+
+## T7：五种机关都要能载入模型、找到活动部件，触发后部件必须动起来。
+## 靠截图抓那一帧全是运气，直接比 transform 才是可靠的。
+func _test_trap_view() -> PackedStringArray:
+	var errs := PackedStringArray()
+	var cs := 2.0
+	for id in ["spikes", "tar", "launcher", "push_wall", "saw"]:
+		var d: Dictionary = Cfg.traps.get(id, {})
+		var model := String(d.get("model", ""))
+		_check(model != "", "%s 没配 model" % id, errs)
+		var anim: Dictionary = d.get("anim", {})
+		_check(not anim.is_empty(), "%s 没配 anim" % id, errs)
+		if model == "" or anim.is_empty():
+			continue
+
+		var v := TrapView.new()
+		add_child(v)
+		var loaded := v.setup(model, cs, Color.WHITE, anim)
+		_check(loaded, "%s 模型 %s 载入失败" % [id, model], errs)
+		if loaded:
+			_check(v.part != null, "%s 在模型里找不到活动部件 %s" %
+				[id, String(anim.get("part", ""))], errs)
+			if v.part != null:
+				var rest := v.part.transform
+				var kind := String(anim.get("type", ""))
+				if kind == "spin" or kind == "bob":
+					v.step(0.5)          # 待机动作，不用触发
+				else:
+					v.fire()
+					v.step(float(anim.get("attack", 0.06)))
+				var moved := not v.part.transform.is_equal_approx(rest)
+				_check(moved, "%s 触发后活动部件没动（anim.axis 方向可能不对）" % id, errs)
+		v.free()
+	return errs
 
 func _test_level() -> PackedStringArray:
 	var errs := PackedStringArray()

@@ -115,13 +115,7 @@ func _build_marker(color: Color) -> void:
 	add_child(_marker)
 
 ## 每帧由敌人传进来：拉得越远单位放得越大、地面标记越明显
-var _dbg := 0
 func apply_view(unit_scale: float, marker: float) -> void:
-	_dbg += 1
-	if _dbg == 40 and _marker != null:
-		print("MK vis=%s gpos=%s scale=%s col=%s inTree=%s mesh=%s" % [
-			str(_marker.visible), str(_marker.global_position), str(_marker.scale),
-			str(_marker_mat.albedo_color), str(_marker.is_inside_tree()), str(_marker.mesh)])
 	if model_root != null:
 		model_root.scale = Vector3.ONE * (_height * unit_scale)
 	if _marker == null:
