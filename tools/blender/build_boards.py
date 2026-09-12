@@ -143,7 +143,9 @@ PARAMS = {
                                     # 现在和中间十字条同宽（cross_half × 2 = 0.096），
                                     # 四个洞因此往内收，边框看着和十字一样粗
         "cross_half":       0.048,  # 十字隔条的半宽
-        "cap_fill":         0.60,   # 锥体宽度 ÷ 槽口宽度。
+        "cap_height":       0.055,  # 锥体高度。**不再等于槽深** —— 想让刺显得尖，
+                                    # 锥体就得比槽深，多出来的部分静止时埋在底座里
+        "cap_fill":         0.58,   # 锥体宽度 ÷ 槽口宽度。
                                     # 给到 0.8 会把槽底的深色全盖住，看着就是四块平方片
         "shaft_fill":       0.80,   # 刺杆宽度 ÷ 锥体底宽
         "shaft_len":        0.220,  # 刺杆长度，决定弹出来以后刺有多长
@@ -656,7 +658,7 @@ def build_spikes(root):
 
     cap_w = hole_w * P["cap_fill"]
     tip = top - P["tip_below_plate"]
-    cap_h = tip - bottom             # 锥底正好落在槽底
+    cap_h = P["cap_height"]          # 锥体比槽深，底端埋进底座里，露出来的部分就尖
     base_z = tip - cap_h
     for i, (sx, sy) in enumerate(((d, d), (-d, d), (d, -d), (-d, -d))):
         box("SpikeShaft%d" % i, (sx, sy, base_z - P["shaft_len"] * 0.5 + 0.004),

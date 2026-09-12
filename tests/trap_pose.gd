@@ -84,19 +84,28 @@ func _fire_time(anim: Dictionary) -> float:
 	return float(anim.get("attack", 0.06)) + float(anim.get("hold", 0.12)) * 0.5
 
 func _world(cs: float) -> void:
+	# 光照直接读 art.json 的 environment —— 检查场景要是自己配一套光，
+	# 出来的图就不代表游戏，调半天是白调的（之前就是这么坑过一次）。
+	var ec: Dictionary = Cfg.art.get("environment", {})
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0.78, 0.83, 0.83)
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.75, 0.82, 0.85)
-	e.ambient_light_energy = 0.5
+	e.ambient_light_color = Cfg.to_color(ec.get("ambient_color"), Color(0.65, 0.70, 0.78))
+	e.ambient_light_energy = float(ec.get("ambient_energy", 0.36))
+	e.ssao_enabled = bool(ec.get("ssao_enabled", true))
+	e.ssao_radius = float(ec.get("ssao_radius", 1.0))
+	e.ssao_intensity = float(ec.get("ssao_intensity", 2.6))
+	e.ssao_power = float(ec.get("ssao_power", 2.0))
 	env.environment = e
 	add_child(env)
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, 150, 0)
-	sun.light_energy = 1.6
+	sun.rotation = Vector3(-deg_to_rad(float(ec.get("sun_elevation_deg", 42.0))),
+		deg_to_rad(float(ec.get("sun_azimuth_deg", 35.0))), 0.0)
+	sun.light_color = Cfg.to_color(ec.get("sun_color"), Color(1.0, 0.96, 0.91))
+	sun.light_energy = float(ec.get("sun_energy", 0.92))
 	sun.shadow_enabled = true
 	add_child(sun)
 
