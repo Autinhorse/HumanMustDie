@@ -194,7 +194,13 @@ PARAMS = {
     # 弹出侧（-Y）有一条结构：深槽 Channel + 发光条 Glow + 两端螺栓 ChBolt。
     # 板子 Plate 绕这条结构的外沿翻起，箭头 Arrow 平嵌在板面里。
     "spring": {
-        "channel_from_edge": 0.075, # 凹槽中心离内区边缘多远
+        "axle_from_edge":   0.075,  # 轴（= 铰链）中心离内区边缘多远
+        # 蓝轴在上、黑轴在下，整对放在板边和金框之间的空档里。
+        # 放在铰链线上的话会被板压掉一半，黑轴更是整根藏在板下面。
+        "glow_r_fill":      0.33,   # 发光轴半径 ÷ 板厚。顶面和板面齐平
+        "axle_r_fill":      0.22,   # 黑轴的厚度 ÷ 板厚。它是一条比蓝轴宽的暗色轴，
+                                    # 蓝轴压在它上面，两侧露出黑边
+        "plate_below_gold": 0.001,  # 板顶比金框顶低多少
         "channel_w":        0.620,  # 凹槽宽度（x 向）
         "channel_d":        0.120,  # 凹槽进深（y 向）
         # 铰链那一侧本来就没有板子盖着，天然就比板面低一截 —— 那里已经是凹槽了，
@@ -208,14 +214,13 @@ PARAMS = {
         "glow_w":           0.540,  # 发光条尺寸
         "glow_d":           0.078,  # 方条模式下的进深
         "glow_h":           0.010,  # 方条模式下的厚度
-        "hinge_offset":     0.058,  # 铰链在凹槽中心外侧多远。板子绕这条线翻起
         "plate_w":          0.780,  # 板宽。要基本铺满内区（内区宽 gold_inner×2 = 0.800），
                                     # 留太多会从两侧露出底板的深色，看着像一圈黑边
         "plate_margin":     0.012,  # 板前沿离内区边缘留多少（open_edge 为 True 时不用）
         "open_edge":        True,   # 自由端（铰链对面）那条金框条去掉、板延伸到格子边。
                                     # 这样"哪一块会动"在任何角度都一眼看得出来 ——
                                     # 板和金框挨着时，某些角度下分界线会完全看不见
-        "plate_thick":      0.018,  # 和尖刺板的内板同厚
+        "plate_thick":      0.036,  # 板厚。做厚一点才有支撑力的感觉
         "edge_outer":       0.390,  # 板边金线（方环）的外沿，要跟着 plate_w 走
         "edge_inner":       0.368,  # 和内沿
         "arrow_len":        0.500,  # 箭头总长
@@ -515,16 +520,31 @@ def arrow_pts(length, width, head, head_w):
 
 def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0), skip=-1):
     """方环：四条边框拼成。石缘和金框都用它。
-    skip 给 0~3 可以少做一条边（0=+Y, 1=-Y, 2=+X, 3=-X），用来开口。"""
+    skip 给 0~3 可以少做一条边（0=+Y, 1=-Y, 2=+X, 3=-X），用来开口。
+    开口以后**和它垂直的那两条会往那一侧延长到 outer**，
+    正好走到角铆钉下面、和铆钉外沿平齐；不延长的话那两条会在开口处戛然而止。"""
     t = outer - inner
     cz = (z0 + z1) * 0.5
     h = z1 - z0
     cx0, cy0 = center
-    for i, (cx, cy, sx, sy) in enumerate((
-            (0, outer - t * 0.5, outer * 2, t),
+    bars = [(0, outer - t * 0.5, outer * 2, t),
             (0, -(outer - t * 0.5), outer * 2, t),
             (outer - t * 0.5, 0, t, inner * 2),
-            (-(outer - t * 0.5), 0, t, inner * 2))):
+            (-(outer - t * 0.5), 0, t, inner * 2)]
+    # 开口那条的垂直方向两条要补长过去
+    if skip in (0, 1):
+        grow = outer - inner
+        off = grow * 0.5 * (-1 if skip == 0 else 1)
+        for i in (2, 3):
+            bx, by, bsx, bsy = bars[i]
+            bars[i] = (bx, by + off, bsx, bsy + grow)
+    elif skip in (2, 3):
+        grow = outer - inner
+        off = grow * 0.5 * (-1 if skip == 2 else 1)
+        for i in (0, 1):
+            bx, by, bsx, bsy = bars[i]
+            bars[i] = (bx + off, by, bsx + grow, bsy)
+    for i, (cx, cy, sx, sy) in enumerate(bars):
         if i == skip:
             continue
         box("%s%d" % (name, i), (cx0 + cx, cy0 + cy, cz), (sx, sy, h), material, parent, bevel)
@@ -633,12 +653,14 @@ def build_spring(root):
     # 自由端在 -Y（铰链在 +Y），对应 ring 的第 1 条边
     floor_frame(frame, gold_skip=1 if P["open_edge"] else -1)
 
-    top = fp("plate_top")
     inner = fp("gold_inner")
+    gold_h = fp("plate_top") + tier_val(fp("gold_above_plate"), fp("gold_above_step"))
+    top = gold_h - P["plate_below_gold"]      # 板顶顶到金框下面
+    bed_top = top - P["plate_thick"]          # 板底 = 底板上表面
 
     # 板下面的底板：板翻起来以后露出来的就是它。少了它板子是浮在空中的。
-    box("Bed", (0, 0, (top - P["plate_thick"]) * 0.5),
-        (inner * 2, inner * 2, top - P["plate_thick"]), "board_base", frame)
+    box("Bed", (0, 0, bed_top * 0.5), (inner * 2, inner * 2, bed_top),
+        "board_base", frame)
 
     # 弹出侧（-Y）的凹槽 + 发光条。设计图里这条是弹簧板最好认的特征，
     # 说明这一侧是铰链、往对面弹。注意它是**凹**进去的：从地面做到板面高度、
@@ -646,24 +668,24 @@ def build_spring(root):
     # 铰链放在**箭头指向的那一侧**（+Y）。板绕铰链翻起时，切向速度的水平分量
     # 是朝铰链那侧的 —— 铰链在哪边就往哪边甩。放在反方向的话，模型的运动方式
     # 和游戏实际的推力方向（沿 facing，也就是箭头）是拧着的。
-    ch_y = inner - P["channel_from_edge"]
-    bed_top = top - P["plate_thick"]          # 槽底 = 底板上表面
-    if P["glow_round"]:
-        # 圆轴：直接躺在凹槽里，本身就是可见的那个件 —— 不再在它下面垫一根暗色条。
-        # 原来是"暗色方条 + 上面盖一条蓝"，深色轴压在蓝块上不好看。
-        r = P["plate_thick"] * 0.5 * P["glow_radius_fill"]
-        cyl("Glow", (0, ch_y, bed_top + r), r, P["channel_w"], "board_accent", frame,
-            axis="x", sides=14)
-    else:
-        box("Channel", (0, ch_y, bed_top + 0.003),
-            (P["channel_w"], P["channel_d"], 0.006), "board_recess", frame)
-        box("Glow", (0, ch_y, bed_top + 0.006 + P["glow_h"] * 0.5),
-            (P["glow_w"], P["glow_d"], P["glow_h"]), "board_accent", frame)
+    # 轴 = 铰链：一根暗色的轴贯通内区（两端露出来），蓝色发光套筒套在它中段。
+    # 板的边就连在这根轴上，绕它翻起。
+    ch_y = inner - P["axle_from_edge"]
+    gr = P["plate_thick"] * P["glow_r_fill"]
+    ar = P["plate_thick"] * P["axle_r_fill"]
+    # 黑轴要**比蓝轴宽**，蓝轴压在它上面，两侧才露得出黑边。
+    # 做成和蓝轴一样细、又摆在它正下方的话，俯视时会被完全挡住；
+    # 贴着板边摆也不行 —— 板比它高，从板那一侧看过来整根都被挡住。
+    gap_c = (ch_y + inner) * 0.5              # 板边到金框内沿之间的空档中心
+    box("Axle", (0, gap_c, bed_top + ar * 0.5), (inner * 2, inner - ch_y, ar),
+        "board_recess", frame)
+    cyl("Glow", (0, gap_c, bed_top + ar + gr), gr, P["channel_w"],
+        "board_accent", frame, axis="x", sides=16)
     # 两端不再单独放螺栓：那两颗以前是八角柱，和新的方形角铆钉撞在一起，
     # 而且位置本来就和角铆钉重叠 —— 角铆钉已经起到那个作用了。
 
     # 板本体：铰链在凹槽外沿，静止时上表面和内板齐平
-    hinge_y = ch_y - P["hinge_offset"]
+    hinge_y = ch_y                            # 板就绕这根轴翻
     mover = joint("Mover", (0, hinge_y, 0.0), root)
     # 板从铰链往 -Y 伸展（铰链在 +Y 侧），所以 cy 是负的。
     # 开口时一直伸到格子边，把原来金框条占的位置补上。
