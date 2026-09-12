@@ -233,28 +233,28 @@ PARAMS = {
     },
 
     # ---------------- 推板（墙面）----------------
-    # z_top - z_bottom = 0.5，宽 ≈ 1.0，所以是 2:1。
+    # 墙高 = 0.5 格（config 里 wall_height 1.0 ÷ cell_size 2.0），
+    # 所以板就铺满 z 0~0.5、宽 1.0，高宽比正好 1:2。
     "push": {
-        "z_bottom":         0.250,  # 面板下沿高度（墙高按 1.0 算）
-        "z_top":            0.750,  # 面板上沿
-        "half_w":           0.485,  # 半宽
-        "frame_w":          0.062,  # 金框条宽（一级）
+        "z_top":            0.500,  # = 墙高。改墙高的话这里要跟着改
+        "half_w":           0.500,  # 半宽 = 半个格子，填满整格
+        "frame_w":          0.070,  # 金框条宽（一级）
         "frame_w_step":     0.008,
-        "front":            0.072,  # 金框正面离墙多远。**面板静止时和它齐平**
-        "groove_w":         0.028,  # 金框内沿暗凹槽的宽度
-        "bolt_r":           0.072,  # 四角铆钉半径（一级）
-        "bolt_r_step":      0.006,
-        "bolt_h":           0.058,
-        "bar_w":            0.050,  # 左右发光竖条的宽度
-        "bar_inset":        0.046,  # 竖条离金框内沿多远
-        "gem_r":            0.130,  # 宝石外半径（一级）
-        "gem_r_step":       0.022,
-        "gem_inner":        0.048,  # 宝石内半径（星形的凹点）
-        "gem_inner_step":   0.010,
-        "gem_h":            0.058,  # 宝石凸出高度。这个是**允许**凸出的
-        "leaf_len":         0.150,
-        "leaf_width":       0.062,
-        "leaf_x":           0.205,
+        "front":            0.070,  # 金框正面离墙多远
+        "bolt_size":        0.120,  # 四角方铆钉的边长（一级）
+        "bolt_size_step":   0.008,
+        "bolt_cut":         0.3333, # 朝内那个角的斜角下刀比例
+        "bolt_body_h":      0.034,  # 铆钉从金框正面再往外多少
+        "bolt_cap_h":       0.016,  # 八角钉帽的高度
+        "bolt_cap_ratio":   0.3333, # 钉帽半径 ÷ bolt_size
+        "bar_w":            0.046,  # 左右发光竖条的宽度
+        "bar_inset":        0.026,  # 竖条离金框内沿多远
+        "panel_recess":     0.010,  # 面板正面比金框正面缩进多少
+        "gem_r":            0.085,  # 宝石外半径（一级）
+        "gem_r_step":       0.015,
+        "gem_inner":        0.032,  # 宝石内半径（星形的凹点）
+        "gem_inner_step":   0.007,
+        "gem_h":            0.045,  # 宝石凸出高度
     },
 }
 
@@ -549,6 +549,29 @@ def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0
         box("%s%d" % (name, i), (cx0 + cx, cy0 + cy, cz), (sx, sy, h), material, parent, bevel)
 
 
+def ccw(pts):
+    """保证轮廓是逆时针的。镜像、换角落之类的操作很容易把点序弄反，
+    统一用有向面积判一下，比每处手工推符号靠谱。"""
+    a = 0.0
+    for i in range(len(pts)):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % len(pts)]
+        a += x1 * y2 - x2 * y1
+    return pts if a > 0 else list(reversed(pts))
+
+
+def bracket_at(cx, cy, sx, sy, size, cut):
+    """一颗方形角铆钉的轮廓：外角落在 (cx, cy)，往 (-sx, -sy) 方向长 size，
+    朝内的那个角切掉斜角。墙面板的角落不是对称的（z 从 0 到墙高），
+    所以不能用 bracket_pts 那套"外角在 (outer, outer)"的假设。"""
+    c = size * cut
+    return ccw([(cx - sx * (size - c), cy - sy * size),
+                (cx,                   cy - sy * size),
+                (cx,                   cy),
+                (cx - sx * size,       cy),
+                (cx - sx * size,       cy - sy * (size - c))])
+
+
 def bracket_pts(outer, size, cut, sx, sy):
     """一颗方形角铆钉的轮廓（逆时针）。
 
@@ -786,79 +809,64 @@ def build_spikes(root):
 
 
 def build_push(root):
-    """推板（墙面，2:1）。部件：
+    """推板（墙面，高宽比 1:2）。部件：
 
-      固定（Frame）  Back        贴墙的石底板
-                     FrameT/B/L/R  金框四条边
-                     LineT/B     二级起金框上下的暗金细线
-                     Bolt        四角铆钉
-                     GrooveT/B/L/R  金框内沿的暗凹槽
+      固定（Frame）  Back        贴墙的底板
+                     FrameT/B/L/R  金框四条
+                     Bolt / BoltT  四角方铆钉 + 八角钉帽
                      Bar         左右两条发光竖条（等级色）
-      活动（Mover）  Panel       中间的浅灰面板，静止时正面和金框齐平
-                     PanelEdge   二级起面板外的一圈描边
+      活动（Mover）  Panel       中间的浅灰面板，静止时正面和金框齐平偏内
                      Gem         面板中央的宝石（等级色，允许凸出）
-                     PanelLeaf   面板上的叶片
 
-    轮廓建在 XZ 平面沿 Y 挤出（prism/gem 的 axis='y'），免得建完再转 90 度。
+    **墙高只有半个格子**，所以板铺满 z 0~0.5、宽 1.0，正好 1:2。
+    原点在墙面上，本体往 +Y 伸出。轮廓建在 XZ 平面沿 Y 挤出（axis='y'），
+    免得建完再转 90 度。
     """
     P = PARAMS["push"]
     frame = joint("Frame", (0, 0, 0), root)
     mover = joint("Mover", (0, 0, 0), root)
 
-    z0, z1 = P["z_bottom"], P["z_top"]
-    cz = (z0 + z1) * 0.5
     hw = P["half_w"]
-    hh = (z1 - z0) * 0.5
+    zt = P["z_top"]
+    fw = tier_val(P["frame_w"], P["frame_w_step"])
     front = P["front"]
 
-    box("Back", (0, 0.014, cz), (hw * 2 + 0.03, 0.028, hh * 2 + 0.03), "board_stone", frame)
+    box("Back", (0, 0.011, zt * 0.5), (hw * 2, 0.022, zt), "board_base", frame)
 
-    fw = tier_val(P["frame_w"], P["frame_w_step"])
-    for nm, bx, bz, sx, sz in (("T", 0, cz + hh - fw * 0.5, hw * 2, fw),
-                               ("B", 0, cz - hh + fw * 0.5, hw * 2, fw),
-                               ("L", -hw + fw * 0.5, cz, fw, hh * 2 - fw * 2),
-                               ("R", hw - fw * 0.5, cz, fw, hh * 2 - fw * 2)):
+    for nm, bx, bz, sx, sz in (("T", 0, zt - fw * 0.5, hw * 2, fw),
+                               ("B", 0, fw * 0.5, hw * 2, fw),
+                               ("L", -hw + fw * 0.5, zt * 0.5, fw, zt - fw * 2),
+                               ("R", hw - fw * 0.5, zt * 0.5, fw, zt - fw * 2)):
         box("Frame" + nm, (bx, front * 0.5, bz), (sx, front, sz), "board_gold", frame)
-    if _tier >= 2:
-        for nm, bz in (("T", cz + hh - fw - 0.008), ("B", cz - hh + fw + 0.008)):
-            box("Line" + nm, (0, front * 0.55, bz), (hw * 2 - fw * 2, front * 1.05, 0.014),
-                "board_gold_dark", frame)
 
-    for i, (bx, bz) in enumerate(((hw - fw * 0.5, cz + hh - fw * 0.5),
-                                 (-hw + fw * 0.5, cz + hh - fw * 0.5),
-                                 (hw - fw * 0.5, cz - hh + fw * 0.5),
-                                 (-hw + fw * 0.5, cz - hh + fw * 0.5))):
-        cyl("Bolt%d" % i, (bx, front + 0.022, bz), tier_val(P["bolt_r"], P["bolt_r_step"]),
-            P["bolt_h"], "board_gold", frame, axis="y", sides=8, rot_z=math.radians(22.5))
+    # 四角方铆钉：外角落在板的四个角上，朝内的角切斜角。坐在金框正面上。
+    bs = tier_val(P["bolt_size"], P["bolt_size_step"])
+    for i, (cx, cz, sx, sz) in enumerate(((hw, zt, 1, 1), (-hw, zt, -1, 1),
+                                          (hw, 0.0, 1, -1), (-hw, 0.0, -1, -1))):
+        prism("Bolt%d" % i, bracket_at(cx, cz, sx, sz, bs, P["bolt_cut"]),
+              front, front + P["bolt_body_h"], "board_gold", frame, axis="y", bevel=0.006)
+        cyl("BoltT%d" % i, (cx - sx * bs * 0.5, front + P["bolt_body_h"] + P["bolt_cap_h"] * 0.5,
+                            cz - sz * bs * 0.5),
+            bs * P["bolt_cap_ratio"], P["bolt_cap_h"], "board_gold", frame,
+            axis="y", sides=8, rot_z=math.radians(22.5))
 
-    gw = P["groove_w"]
-    for nm, bx, bz, sx, sz in (("T", 0, cz + hh - fw - gw * 0.5, hw * 2 - fw * 2, gw),
-                               ("B", 0, cz - hh + fw + gw * 0.5, hw * 2 - fw * 2, gw),
-                               ("L", -hw + fw + gw * 0.5, cz, gw, hh * 2 - fw * 2),
-                               ("R", hw - fw - gw * 0.5, cz, gw, hh * 2 - fw * 2)):
-        box("Groove" + nm, (bx, front * 0.42, bz), (sx, front * 0.84, sz),
-            "board_recess", frame)
-
-    bar_x = hw - fw - P["bar_inset"]
+    # 左右两条发光竖条，贴着金框内沿
+    bar_x = hw - fw - P["bar_inset"] - P["bar_w"] * 0.5
+    bar_h = zt - fw * 2 - 0.020
     for i, sx in enumerate((-1, 1)):
-        box("Bar%d" % i, (sx * bar_x, front * 0.62, cz),
-            (P["bar_w"], front * 0.80, hh * 2 - fw * 2 - 0.030), "board_accent", frame)
+        box("Bar%d" % i, (sx * bar_x, front * 0.62, zt * 0.5),
+            (P["bar_w"], front * 0.80, bar_h), "board_accent", frame)
 
-    pw = (bar_x - P["bar_w"]) * 2 - 0.018
-    ph = hh * 2 - fw * 2 - 0.026
-    box("Panel", (0, front * 0.5 + 0.008, cz), (pw, front - 0.016, ph), "board_plate", mover)
-    if _tier >= 2:
-        box("PanelEdge", (0, front * 0.5 - 0.004, cz), (pw + 0.030, front - 0.020, ph + 0.030),
-            "board_gold_dark" if _tier == 2 else "board_gold", mover)
+    # 活动件：中间那块浅灰面板。正面比金框略缩进，推出去才看得出在动。
+    pw = (bar_x - P["bar_w"] * 0.5) * 2 - 0.016
+    ph = zt - fw * 2 - 0.016
+    pf = front - P["panel_recess"]
+    box("Panel", (0, pf * 0.5 + 0.011, zt * 0.5), (pw, pf - 0.022, ph),
+        "board_plate", mover)
 
-    gem("Gem", (0, front + 0.004, cz), tier_val(P["gem_r"], P["gem_r_step"]),
+    gem("Gem", (0, pf, zt * 0.5), tier_val(P["gem_r"], P["gem_r_step"]),
         tier_val(P["gem_inner"], P["gem_inner_step"]), P["gem_h"], "board_accent",
         mover, axis="y")
-    if _tier >= 2:
-        for i, sx in enumerate((-1, 1)):
-            leaf("PanelLeaf%d" % i, (sx * P["leaf_x"], cz), P["leaf_len"],
-                 P["leaf_width"], front - 0.010, front + 0.006, "board_gold", mover,
-                 angle=math.radians(-26 * sx), axis="y")
     return root
 
 

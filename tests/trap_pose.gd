@@ -10,7 +10,10 @@ const ORDER := ["spikes", "tar", "launcher", "push_wall", "saw"]
 
 func _ready() -> void:
 	var cs: float = float(Cfg.config.get("grid", {}).get("cell_size", 2.0))
-	var wall_h: float = float(Cfg.config.get("grid", {}).get("wall_height", 1.0)) * cs
+	# wall_height 在配置里**已经是世界单位**（board_view 直接拿它当高度用），
+	# 不要再乘 cell_size —— 乘了的话检查场景的墙比游戏里高一倍，
+	# 墙面机关看着就永远对不上。
+	var wall_h: float = float(Cfg.config.get("grid", {}).get("wall_height", 1.0))
 	_world(cs)
 
 	var spacing := cs * 1.6
