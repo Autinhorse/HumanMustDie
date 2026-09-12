@@ -312,6 +312,7 @@ func _update_camera() -> void:
 		cam.size = _ortho_size
 	cam.near = 0.1
 	cam.far = _dist * 4.0
+	_update_zoom_readability()
 	if _backdrop != null:
 		var vp := get_viewport().get_visible_rect().size
 		var aspect: float = vp.x / max(vp.y, 1.0)
@@ -494,6 +495,23 @@ func _unhandled_input(event: InputEvent) -> void:
 				if k == KEY_1 + i and i < 9:
 					select_trap(String(allowed[i]))
 					break
+
+## 拉远时敌人只有几个像素，按可视高度补偿：单位放大 + 地面标记淡入
+func _update_zoom_readability() -> void:
+	if game == null:
+		return
+	var cfg: Dictionary = Cfg.art.get("zoom_readability", {})
+	if not bool(cfg.get("enabled", true)):
+		game.view_unit_scale = 1.0
+		game.view_marker = 0.0
+		return
+	var base := float(cfg.get("base_ortho", 26.0))
+	var full := float(cfg.get("unit_scale_ortho", 70.0))
+	var t: float = clampf((_ortho_size - base) / max(full - base, 0.001), 0.0, 1.0)
+	game.view_unit_scale = lerpf(1.0, float(cfg.get("unit_scale_max", 1.7)), t)
+	var ms := float(cfg.get("marker_start", 30.0))
+	var mf := float(cfg.get("marker_full", 60.0))
+	game.view_marker = clampf((_ortho_size - ms) / max(mf - ms, 0.001), 0.0, 1.0)
 
 ## 按地图大小自动取景：把地图四角投到相机平面，算出需要多大的正交高度
 func _fit_camera_to_map() -> void:

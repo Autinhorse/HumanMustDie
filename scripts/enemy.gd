@@ -168,6 +168,7 @@ func step(dt: float) -> void:
 func _animate(prev_pos: Vector3, dt: float) -> void:
 	if actor == null:
 		return
+	actor.apply_view(game.view_unit_scale, game.view_marker)
 	var delta := position - prev_pos
 	delta.y = 0.0
 	var dist := delta.length()

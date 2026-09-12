@@ -25,6 +25,11 @@ var _head_lean := 4.0
 var _bob := 0.06
 var _locked_arms: Array = []
 var _shade_darken := 0.42
+var _height := 1.0
+var _marker: MeshInstance3D = null
+var _marker_mat: StandardMaterial3D = null
+var _marker_alpha := 0.85
+var _marker_color := Color.WHITE
 var _sword_free := false
 var _sword_vel := Vector3.ZERO
 var _sword_spin := Vector3.ZERO
@@ -41,6 +46,7 @@ func setup(p_model_id: String, height: float, color: Color) -> bool:
 		return false
 	model_root = packed.instantiate()
 	add_child(model_root)
+	_height = height
 	model_root.scale = Vector3.ONE * height      # 模型本体做成 1.0 高，按敌人身高缩放
 
 	for n in PART_NAMES:
@@ -49,6 +55,7 @@ func setup(p_model_id: String, height: float, color: Color) -> bool:
 			parts[n] = node
 			rest[n] = node.transform
 	_load_anim_params()
+	_build_marker(color)
 	_collect_tint_materials(model_root)
 	set_color(color)
 	ok = parts.has("LegL") and parts.has("LegR")
@@ -78,6 +85,60 @@ func _find(node: Node, name: String) -> Node3D:
 		if r != null:
 			return r
 	return null
+
+## 地面标记：拉远时单位只有几个像素，靠这个圆点保证看得见
+func _build_marker(color: Color) -> void:
+	var cfg: Dictionary = Cfg.art.get("zoom_readability", {})
+	if not bool(cfg.get("enabled", true)):
+		return
+	_marker_alpha = float(cfg.get("marker_alpha", 0.85))
+	var r: float = _height * 0.5 * float(cfg.get("marker_radius_mul", 1.9))
+	var disc := CylinderMesh.new()
+	disc.top_radius = r
+	disc.bottom_radius = r
+	disc.height = 0.05
+	disc.radial_segments = 18
+	_marker_mat = StandardMaterial3D.new()
+	# 比本体再亮一点，压在地面上才跳得出来
+	var c: Color = color.lightened(0.15)
+	_marker_color = Color(c.r, c.g, c.b, 1.0)
+	_marker_mat.albedo_color = Color(c.r, c.g, c.b, 0.0)
+	_marker_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_marker_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_marker = MeshInstance3D.new()
+	_marker.name = "GroundMarker"
+	_marker.mesh = disc
+	_marker.material_override = _marker_mat
+	_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_marker.position.y = 0.04
+	_marker.visible = false
+	add_child(_marker)
+
+## 每帧由敌人传进来：拉得越远单位放得越大、地面标记越明显
+var _dbg := 0
+func apply_view(unit_scale: float, marker: float) -> void:
+	_dbg += 1
+	if _dbg == 40 and _marker != null:
+		print("MK vis=%s gpos=%s scale=%s col=%s inTree=%s mesh=%s" % [
+			str(_marker.visible), str(_marker.global_position), str(_marker.scale),
+			str(_marker_mat.albedo_color), str(_marker.is_inside_tree()), str(_marker.mesh)])
+	if model_root != null:
+		model_root.scale = Vector3.ONE * (_height * unit_scale)
+	if _marker == null:
+		return
+	if marker <= 0.01:
+		_marker.visible = false
+		return
+	_marker.visible = true
+	_marker.scale = Vector3(marker, 1.0, marker)
+	# 注意：不能写 albedo_color.a = x —— 属性返回的是副本，改了不会写回材质
+	var mc: Color = _marker_color
+	mc.a = _marker_alpha * marker
+	_marker_mat.albedo_color = mc
+
+func hide_marker() -> void:
+	if _marker != null:
+		_marker.visible = false
 
 ## 主色（armor_primary）按敌人类型换色；其余配色沿用模型自带的
 func _collect_tint_materials(node: Node) -> void:
@@ -189,6 +250,7 @@ func set_tumble(t: float) -> void:
 
 ## 死亡：丢剑 + 四肢摊平。t 从 0 到 1。
 func set_death(t: float) -> void:
+	hide_marker()
 	if not _sword_free:
 		_release_sword()
 	var e: float = 1.0 - pow(1.0 - clampf(t, 0.0, 1.0), 3.0)    # 先快后慢

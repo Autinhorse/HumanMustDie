@@ -2,9 +2,10 @@
 // 挂在相机上的全屏四边形，render_priority 拉高保证在所有东西之后画。
 // 需要 Forward+（法线粗糙度贴图只有 Forward+ 有）。
 shader_type spatial;
-render_mode unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_disabled;
+// blend_mix + 只输出线本身：不能去读屏幕拷贝再整屏覆盖，那样会把半透明物体
+// （地面标记、放置预览、云）全擦掉 —— Godot 的屏幕拷贝发生在半透明通道之前。
+render_mode unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_disabled, blend_mix;
 
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest, repeat_disable;
 uniform sampler2D normal_tex : hint_normal_roughness_texture, filter_nearest, repeat_disable;
 
@@ -28,7 +29,6 @@ float view_depth(vec2 uv, mat4 inv_proj) {
 
 void fragment() {
 	vec2 texel = thickness / VIEWPORT_SIZE;
-	vec3 base = texture(screen_tex, SCREEN_UV).rgb;
 	float d0 = view_depth(SCREEN_UV, INV_PROJECTION_MATRIX);
 
 	vec2 off[4] = {vec2(texel.x, 0.0), vec2(-texel.x, 0.0), vec2(0.0, texel.y), vec2(0.0, -texel.y)};
@@ -50,5 +50,6 @@ void fragment() {
 	// 天空/背景（深度极远）不描边。Godot 的 fragment 里不能 return，用系数屏蔽。
 	e *= 1.0 - step(depth_fade * 2.0, d0);
 
-	ALBEDO = mix(base, outline_color.rgb, clamp(e, 0.0, 1.0));
+	ALBEDO = outline_color.rgb;
+	ALPHA = clamp(e, 0.0, 1.0);
 }

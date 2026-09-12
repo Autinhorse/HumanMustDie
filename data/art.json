@@ -72,6 +72,18 @@
     }
   },
 
+  "zoom_readability": {
+    "_comment": "拉远时敌人会变成几个像素，这里按正交可视高度自动补偿：单位放大 + 地面标记淡入。base_ortho 是不做补偿的基准高度。",
+    "enabled": true,
+    "base_ortho": 26.0,
+    "unit_scale_max": 1.7,
+    "unit_scale_ortho": 70.0,
+    "marker_start": 30.0,
+    "marker_full": 60.0,
+    "marker_alpha": 0.72,
+    "marker_radius_mul": 1.5
+  },
+
   "environment": {
     "sky_top":     "#6B8C91",
     "sky_horizon": "#A6C1C0",

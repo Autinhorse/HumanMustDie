@@ -31,6 +31,9 @@ var paused: bool = false
 var sim_speed: float = 1.0
 var speed_index: int = 1
 var sim_time: float = 0.0
+# 由 main.gd 随相机缩放更新：单位放大倍率、地面标记强度（0~1）
+var view_unit_scale: float = 1.0
+var view_marker: float = 0.0
 var wave_elapsed: float = 0.0
 var rng := RandomNumberGenerator.new()
 var stats := RunStats.new()
