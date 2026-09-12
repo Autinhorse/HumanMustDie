@@ -33,6 +33,7 @@ func _ready() -> void:
 	game.name = "Game"
 	add_child(game)
 	game.start(_level_from_cmdline())
+	game.changed.connect(_on_game_changed)
 
 	fx = Fx.new()
 	fx.name = "Fx"
@@ -65,11 +66,41 @@ func switch_level(id: String) -> void:
 	game.start(id)
 	_refresh_board()
 
+## 哪些格子要把地板让开：放了 cuts_floor 机关的格子。
+## 机关是运行时放的，所以放置/拆除以后要重建一次地块网格。
+func _pit_cells() -> Dictionary:
+	var out: Dictionary = {}
+	if game == null or game.grid == null:
+		return out
+	for t in game.trap_list():
+		if bool(t.data.get("cuts_floor", false)):
+			out[t.cell] = true
+	return out
+
+## 地板要不要让开是跟着机关走的。挂在 game.changed 上而不是放置回调上 ——
+## 放置有好几条路径（界面点击、演示脚本直接调 place、读档），挂回调会漏。
+var _pit_sig: Array = []
+
+func _on_game_changed() -> void:
+	if game.load_error != "":
+		return
+	var cells: Dictionary = _pit_cells()
+	var sig: Array = cells.keys()
+	sig.sort()
+	if sig == _pit_sig:
+		return
+	_pit_sig = sig
+	board.build(game.grid, game.entrance_cells, cells)
+
 func _refresh_board() -> void:
 	if game.load_error != "":
 		hud.refresh()
 		return
-	board.build(game.grid, game.entrance_cells)
+	var cells: Dictionary = _pit_cells()
+	var sig: Array = cells.keys()
+	sig.sort()
+	_pit_sig = sig
+	board.build(game.grid, game.entrance_cells, cells)
 	preview.setup(game.grid)
 	_pivot.position = game.grid.center_world()
 	_dist = Cfg.num("camera.distance", 60.0)

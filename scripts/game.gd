@@ -48,6 +48,10 @@ func add_hitstop(seconds: float) -> void:
 
 ## 火花用打中它的那个机关的颜色 —— 一眼看出这一下是谁打的，
 ## 连锁击杀的时候尤其重要（文档 §19 的卖点就是连锁）。
+## 当前放着的机关。表现层要按机关决定地块怎么画（比如尖刺板要挖掉地板）。
+func trap_list() -> Array:
+	return _trap_root.get_children() if _trap_root != null else []
+
 func source_color(source: String) -> Color:
 	var d: Dictionary = Cfg.traps.get(source, {})
 	if d.is_empty():

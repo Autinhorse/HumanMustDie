@@ -34,7 +34,10 @@ var _c_obs_top := Color.GRAY
 var _c_obs_side := Color.GRAY
 var _c_line := Color.GRAY
 
-func build(p_grid: HGrid, entrance_cells: Array) -> void:
+## pit_cells 里的格子**不画地面** —— 放了带竖井的机关（比如尖刺板）的格子，
+## 地板得让开，否则井底沉到 y=0 以下就只能看到地板。
+## 这些格子由机关自己的几何盖住（金框铺到格子边、底座在井底封死）。
+func build(p_grid: HGrid, entrance_cells: Array, pit_cells: Dictionary = {}) -> void:
 	grid = p_grid
 	for c in get_children():
 		remove_child(c)
@@ -94,7 +97,8 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 			var ground_color: Color = bridge_top if t == HGrid.Cell.BRIDGE else _pick(floor_tops, floor_weights, rng)
 			if entrance_set.has(cell):
 				ground_color = entrance_col
-			_ground_tile(st, cell, center, ground_color)
+			if not pit_cells.has(cell):
+				_ground_tile(st, cell, center, ground_color)
 
 			# --- 岛的轮廓：只有挨着空地（或出图）的那一面才有侧面
 			var bottom: float = -(_bridge_thick if t == HGrid.Cell.BRIDGE else _thick)

@@ -170,10 +170,12 @@ PARAMS = {
                                     # 按约定等于隔条全宽（= cross_half × 2），
                                     # 洞口宽度由它和 hole_count 反算出来
         "cross_half":       0.040,  # 隔条的半宽
-        "hole_bottom":      0.002,  # 方竖井的井底高度。压到 0 附近就行 ——
-                                    # 游戏里 y=0 以下会被地板挡住，可见井深最多
-                                    # 就是 plate_top，想要更深的井得把 plate_top 抬高
-        "cap_aspect":       0.45,  # 锥尖的**高宽比**（高 ÷ 宽）。
+        "hole_bottom":     -0.220,  # 方竖井的井底高度。**可以沉到地面以下** ——
+                                    # traps.json 里 spikes 标了 cuts_floor，
+                                    # 放下去的时候游戏会把那一格的地板让开
+                                    # （scripts/main.gd 的 _pit_cells），
+                                    # 所以井深不再被 plate_top 卡住了
+        "cap_aspect":       0.80,  # 锥尖的**高宽比**（高 ÷ 宽）。
                                     # **别调高**：尖锥在井口露出的横截面极细，
                                     # 而刺的颜色是用来标等级的，看不见等于功能失效。
                                     # 实测静止时能看到的青色像素（spike_fill 一起调）：

@@ -39,7 +39,8 @@
       "hold": 0.18,
       "release": 0.34
     },
-    "tier": 1
+    "tier": 1,
+    "cuts_floor": true
   },
   "tar": {
     "name": "黏胶地面",
