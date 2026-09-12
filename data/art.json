@@ -131,7 +131,7 @@
     "adjust_contrast": 1.08,
     "adjust_saturation": 1.12,
 
-    "outline_enabled": true,
+    "outline_enabled": false,
     "outline_color": "#4D5560",
     "outline_thickness": 1.2,
     "outline_depth_threshold": 0.08,
@@ -144,8 +144,10 @@
 
   "board": {
     "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝。ao_* 是烘焙进顶点色的环境光遮蔽：ao_corner 管墙角、ao_side 管竖直面底部。",
-    "ao_corner": 0.34,
-    "ao_side": 0.24,
+    "ao_subdiv": 4,
+    "ao_radius": 1.25,
+    "ao_corner": 0.55,
+    "ao_side": 0.32,
     "grid_line_width": 0.07,
     "tile_lift": 0.002,
     "obstacle_height_mul": 1.35,

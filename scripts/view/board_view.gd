@@ -20,6 +20,8 @@ var _bridge_thick := 0.15
 var _line_w := 0.06
 var _ao_corner := 0.34
 var _ao_side := 0.24
+var _ao_subdiv := 4
+var _ao_radius := 1.25
 var _lift := 0.002
 var _c_floor_side := Color.GRAY
 var _c_bridge_side := Color.GRAY
@@ -47,6 +49,8 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 	_lift = float(board_cfg.get("tile_lift", 0.002))
 	_ao_corner = float(board_cfg.get("ao_corner", 0.34))
 	_ao_side = float(board_cfg.get("ao_side", 0.24))
+	_ao_subdiv = maxi(int(board_cfg.get("ao_subdiv", 4)), 1)
+	_ao_radius = float(board_cfg.get("ao_radius", 1.25))
 
 	var floor_tops: Array = pal.get("floor_top", ["#DED6C4"])
 	var floor_weights: Array = pal.get("floor_top_weights", [1.0])
@@ -129,12 +133,48 @@ func _touches_open(cell: Vector2i) -> bool:
 
 ## 一格地面：整格的缝色打底 + 稍微抬起、四周内缩的面色。出细缝但保持共面，不产生凸块。
 func _ground_tile(st: SurfaceTool, cell: Vector2i, center: Vector3, color: Color) -> void:
-	var ao := _corner_ao(cell)
+	# 缝色打底：整格一块，不用细分（大部分会被面色盖住）
 	if _line_w > 0.0:
-		_top_quad(st, center, _cs, 0.0, _c_line, ao)
-		_top_quad(st, center, _cs - _line_w, _lift, color, ao)
-	else:
-		_top_quad(st, center, _cs, 0.0, color, ao)
+		_top_quad(st, center, _cs, 0.0, _c_line, _corner_ao(cell))
+	# 面色细分成 N×N 小块 —— 一格一个四边形的话，AO 只能在四个角取值，
+	# 暗部会被摊成两米宽的糊；细分之后才能贴住墙根。
+	var size: float = _cs - _line_w
+	var n := _ao_subdiv
+	var step: float = size / float(n)
+	var x0: float = center.x - size * 0.5
+	var z0: float = center.z - size * 0.5
+	for j in n:
+		for i in n:
+			var ax: float = x0 + float(i) * step
+			var az: float = z0 + float(j) * step
+			var bx: float = ax + step
+			var bz: float = az + step
+			_quad(st,
+				Vector3(ax, _lift, az), Vector3(bx, _lift, az),
+				Vector3(bx, _lift, bz), Vector3(ax, _lift, bz), color,
+				PackedFloat32Array([_ao_at(ax, az), _ao_at(bx, az), _ao_at(bx, bz), _ao_at(ax, bz)]))
+
+## 地面上任意一点的遮蔽：看周围几格里有多少"高出地面的东西"，按距离衰减累加。
+## 这样暗部是从墙根往外柔和铺开，而不是整格一个亮度。
+func _ao_at(x: float, z: float) -> float:
+	if _ao_corner <= 0.0:
+		return 1.0
+	var here := grid.world_to_cell(Vector3(x, 0.0, z))
+	var occ := 0.0
+	var reach := int(ceil(_ao_radius / _cs)) + 1
+	var half := _cs * 0.5
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var c := here + Vector2i(dx, dy)
+			if not _blocks(c):
+				continue
+			var cc := grid.cell_center(c)
+			# 到该格矩形的距离（在格子里就是 0）
+			var ex: float = max(absf(x - cc.x) - half, 0.0)
+			var ez: float = max(absf(z - cc.z) - half, 0.0)
+			var d: float = sqrt(ex * ex + ez * ez)
+			occ += max(0.0, 1.0 - d / _ao_radius)
+	return 1.0 - _ao_corner * clampf(occ, 0.0, 1.0)
 
 ## 四个角各看两条边 + 一个斜角有没有挡住自己，挡得越多越暗（经典的方块地形 AO）
 func _corner_ao(cell: Vector2i) -> PackedFloat32Array:
