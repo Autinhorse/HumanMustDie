@@ -98,10 +98,6 @@ PARAMS = {
         "gold_inner":       0.400,  # 金框内沿；两者之差 = 金框宽度（现 0.100）
         "gold_top":         0.039,  # 金框高度（一级）。压得很矮，铆钉才明显高出一截
         "gold_top_step":    0.004,  # 每级加高多少
-        "groove_width":     0.020,  # 金框内侧那圈暗凹槽的宽度。
-                                    # 它负责把金框和内板分开，去掉的话整块板会糊成一片
-        "groove_below":     0.000,  # 凹槽顶面比内板低多少。0 = 和板面齐平，
-                                    # 这时那圈暗色靠**颜色**分层，不再靠高低差
         "goldline_width":   0.016,  # 二级起，金框外侧那道暗金细线的宽度
 
         # 四角铆钉：正方形，外沿和金框外沿齐平（也就是正好占住格子的四个角）
@@ -115,7 +111,7 @@ PARAMS = {
         "bolt_cap_ratio":   0.3333, # 钉帽半径 ÷ bolt_size。
                                     # 上限是 0.471（正方形中心到朝内斜角的距离），
                                     # 超过就会切出斜角外面去
-        "plate_top":        0.064,  # 内板上表面 = 暗凹槽的上表面（两者齐平）。
+        "plate_top":        0.064,  # 内板上表面。
                                     # **所有活动件静止时都对齐到这个高度**
     },
 
@@ -124,7 +120,8 @@ PARAMS = {
     # 槽壁贴暗色内衬 Liner，槽底是砖体 Base 的顶面。
     "spikes": {
         "base_depth":       0.300,  # 砖体往地下的厚度。刺收回去要能整根藏进去
-        "plate_inset":      0.030,  # 内板外沿从 gold_inner 再往里缩多少（让开暗凹槽）
+        "plate_inset":      0.000,  # 内板外沿从 gold_inner 再往里缩多少。
+                                    # 0 = 内板直接顶到金框内沿，两者相接
         "plate_thick":      0.039,  # 内板这一层的厚度。板底 = plate_top - plate_thick，
                                     # 底座顶面就顶在那里（也就是槽底），槽深 = 这个值
         "plate_rim":        0.096,  # 内板靠四边那圈的宽度。
@@ -519,16 +516,14 @@ def tier_val(base, step):
 def floor_frame(frame):
     """地面板共用的边框，从外到内：
 
-      Gold      金框，外沿直接顶到格子边（没有石缘，板子就坐在地面上）
+      Gold      金框，外沿直接顶到格子边（没有石缘，板子就坐在地面上），
+                内沿和内板直接相接
       GoldLine  二级起金框内侧的暗金细线
       Bolt      四角的**方形**铆钉，外角贴着格子角，朝内的角切斜角
                 （BoltT 是它顶上的收口）
-      Groove    金框内侧的暗凹槽 —— 靠它把金框和内板分开，去掉整块板会糊成一片
     """
     gold_h = tier_val(fp("gold_top"), fp("gold_top_step"))
     ring("Gold", frame, fp("gold_outer"), fp("gold_inner"), 0.0, gold_h, "board_gold")
-    ring("Groove", frame, fp("gold_inner"), fp("gold_inner") - fp("groove_width"),
-         0.0, fp("plate_top") - fp("groove_below"), "board_recess")
     if _tier >= 2:
         ring("GoldLine", frame, fp("gold_inner") + fp("goldline_width"), fp("gold_inner"),
              0.0, gold_h + 0.010, "board_gold_dark")
