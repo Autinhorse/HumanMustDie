@@ -96,6 +96,7 @@ func _build_world() -> void:
 	sun.shadow_blur = _ec(env_cfg, "shadow_blur", 1.4)
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 200.0
+	sun.light_volumetric_fog_energy = _ec(env_cfg, "sun_volumetric_energy", 2.2)
 	add_child(sun)
 
 	# 补光：把阴影面提亮成天空色，避免暗部发死
@@ -282,6 +283,18 @@ func _make_environment(env_cfg: Dictionary) -> Environment:
 		e.adjustment_brightness = _ec(env_cfg, "adjust_brightness", 1.0)
 		e.adjustment_contrast = _ec(env_cfg, "adjust_contrast", 1.08)
 		e.adjustment_saturation = _ec(env_cfg, "adjust_saturation", 1.12)
+
+	# 体积雾：岛下的云用 FogVolume 来做，这里只开总开关，全局密度给 0，
+	# 让密度完全由各个 FogVolume 提供。实测正交相机下工作正常。
+	if bool(env_cfg.get("volumetric_enabled", true)):
+		e.volumetric_fog_enabled = true
+		e.volumetric_fog_density = _ec(env_cfg, "volumetric_density", 0.0)
+		e.volumetric_fog_albedo = _hex(env_cfg, "volumetric_albedo", Color(1, 1, 1))
+		e.volumetric_fog_length = _ec(env_cfg, "volumetric_length", 260.0)
+		e.volumetric_fog_detail_spread = _ec(env_cfg, "volumetric_detail_spread", 2.0)
+		e.volumetric_fog_ambient_inject = _ec(env_cfg, "volumetric_ambient_inject", 1.0)
+		e.volumetric_fog_gi_inject = _ec(env_cfg, "volumetric_gi_inject", 1.0)
+		e.volumetric_fog_anisotropy = _ec(env_cfg, "volumetric_anisotropy", 0.2)
 
 	if bool(env_cfg.get("ssao_enabled", true)):
 		e.ssao_enabled = true

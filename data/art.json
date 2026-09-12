@@ -85,17 +85,20 @@
   },
 
   "under_clouds": {
-    "_comment": "岛下方铺一层云。坑里看到的应该是岩体一直往下延伸、再往下被云挡住，而不是一块暗底板。云铺在岛的投影范围内（含一圈外扩），所以从坑里和岛缘都看得到。",
+    "_comment": "岛下方的体积云（FogVolume）。density 是浓度，edge_fade 是边缘虚化，flatten 是压扁程度。云铺在岛的投影范围内（含一圈外扩），坑里和岛缘看到的都是它。",
     "enabled": true,
-    "count": 42,
+    "count": 26,
     "y_center": -9.5,
     "y_spread": 2.6,
-    "radius_min": 2.6,
-    "radius_max": 5.2,
-    "flatten": 0.28,
+    "radius_min": 5.0,
+    "radius_max": 11.0,
+    "flatten": 0.5,
+    "density": 5.0,
+    "edge_fade": 0.35,
+    "emission": "#7C858A",
     "margin": 2.0,
     "color": "#DCE6E8",
-    "alpha": 1.0
+    "_alpha_unused": 1.0
   },
 
   "core_fx": {
@@ -122,6 +125,15 @@
     "fog_density": 0.0018,
     "fog_sky_affect": 0.0,
     "fog_aerial_perspective": 0.32,
+
+    "volumetric_enabled": true,
+    "volumetric_density": 0.0,
+    "volumetric_albedo": "#FFFFFF",
+    "volumetric_length": 260.0,
+    "volumetric_ambient_inject": 1.0,
+    "volumetric_gi_inject": 1.0,
+    "volumetric_anisotropy": 0.2,
+    "sun_volumetric_energy": 4.5,
 
     "ssao_enabled": true,
     "ssao_radius": 1.0,

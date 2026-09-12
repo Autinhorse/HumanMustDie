@@ -279,22 +279,14 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, colo
 		st.set_color(Color(color.r * f, color.g * f, color.b * f, color.a))
 		st.add_vertex(pts[k])
 
-## 岛下方铺一层云。参考图里坑底不是一块暗板，而是岩体一直往下延伸、
-## 再往下被云挡住 —— 所以这里只铺云，让岩体自己去当"坑壁"。
+## 岛下方铺一层云。用 FogVolume 做真正的体积云 —— 之前用压扁的球体 +
+## 无光照材质，结果是一个个纯色圆片，没有渐变也没有体积感。
 func _build_under_clouds() -> void:
 	var cfg: Dictionary = Cfg.art.get("under_clouds", {})
 	if not bool(cfg.get("enabled", true)):
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(Cfg.art.get("rock", {}).get("seed", 20260911)) + 91
-
-	var mat := StandardMaterial3D.new()
-	var c := _col(cfg, "color", Color(0.86, 0.90, 0.91))
-	var alpha := float(cfg.get("alpha", 1.0))
-	mat.albedo_color = Color(c.r, c.g, c.b, alpha)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	if alpha < 0.999:
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 	var root := Node3D.new()
 	root.name = "UnderClouds"
@@ -305,54 +297,24 @@ func _build_under_clouds() -> void:
 	var h: float = float(grid.h) * _cs
 	var yc := float(cfg.get("y_center", -9.5))
 	var ys := float(cfg.get("y_spread", 2.6))
-	for i in int(cfg.get("count", 42)):
-		var mi := MeshInstance3D.new()
-		var sp := SphereMesh.new()
-		var r := rng.randf_range(float(cfg.get("radius_min", 2.6)), float(cfg.get("radius_max", 5.2)))
-		sp.radius = r
-		sp.height = r * 2.0
-		sp.radial_segments = 14
-		sp.rings = 7
-		mi.mesh = sp
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.position = Vector3(
+	var albedo := _col(cfg, "color", Color(0.92, 0.95, 0.96))
+	for i in int(cfg.get("count", 22)):
+		var fv := FogVolume.new()
+		fv.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID
+		var r := rng.randf_range(float(cfg.get("radius_min", 5.0)), float(cfg.get("radius_max", 11.0)))
+		fv.size = Vector3(r * 2.0, r * 2.0 * float(cfg.get("flatten", 0.5)), r * 2.0 * rng.randf_range(0.75, 1.25))
+		var fm := FogMaterial.new()
+		fm.density = float(cfg.get("density", 4.0)) * rng.randf_range(0.7, 1.3)
+		fm.albedo = albedo
+		fm.edge_fade = float(cfg.get("edge_fade", 0.35))
+		# 光只从一个方向来，背光那半会发灰。加一点自发光把云整体提白。
+		fm.emission = _col(cfg, "emission", Color(0.30, 0.33, 0.35))
+		fv.material = fm
+		fv.position = Vector3(
 			rng.randf_range(-margin, w + margin),
 			yc + rng.randf_range(-ys, ys),
 			rng.randf_range(-margin, h + margin))
-		mi.scale = Vector3(1.0, float(cfg.get("flatten", 0.28)), 1.0)
-		root.add_child(mi)
-
-## 从地图边缘往里灌水，灌不到的空地格就是被岛围住的坑
-func _enclosed_void_cells() -> Array[Vector2i]:
-	var outside := {}
-	var stack: Array[Vector2i] = []
-	for x in grid.w:
-		for y in [0, grid.h - 1]:
-			var c := Vector2i(x, y)
-			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
-				outside[c] = true
-				stack.append(c)
-	for y in grid.h:
-		for x in [0, grid.w - 1]:
-			var c := Vector2i(x, y)
-			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
-				outside[c] = true
-				stack.append(c)
-	while not stack.is_empty():
-		var c: Vector2i = stack.pop_back()
-		for d in HGrid.DIRS:
-			var n: Vector2i = c + d
-			if grid.in_bounds(n) and grid.get_cell(n) == HGrid.Cell.VOID and not outside.has(n):
-				outside[n] = true
-				stack.append(n)
-	var out: Array[Vector2i] = []
-	for y in grid.h:
-		for x in grid.w:
-			var c := Vector2i(x, y)
-			if grid.get_cell(c) == HGrid.Cell.VOID and not outside.has(c):
-				out.append(c)
-	return out
+		root.add_child(fv)
 
 func _build_core(pal: Dictionary) -> void:
 	var cores := grid.cells_of_type(HGrid.Cell.CORE)
