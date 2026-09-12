@@ -201,10 +201,13 @@ PARAMS = {
         # 不需要再堆一个块。Channel 只是铺在槽底的一层暗色，Glow 叠在它上面。
         # 老版本把 Channel 做成了从地面到板面的实心盒子，结果把 Glow 整个包在里面，
         # 发光条完全看不见。
-        "channel_h":        0.006,  # 槽底那层暗色的厚度
+        "glow_round":       True,   # 发光条做成圆轴。False 就退回方条
+        "glow_radius_fill": 1.40,   # 圆轴直径 ÷ 凹槽深度。1.0 = 顶面和板面齐平，
+                                    # 大于 1 会微微凸出凹槽，圆的形状才读得出来
+                                    # （齐平的话只露出上半个弧，看着还是一条细线）
         "glow_w":           0.540,  # 发光条尺寸
-        "glow_d":           0.078,
-        "glow_h":           0.010,  # 发光条厚度。顶面要低于板面，才算嵌在槽里
+        "glow_d":           0.078,  # 方条模式下的进深
+        "glow_h":           0.010,  # 方条模式下的厚度
         "hinge_offset":     0.058,  # 铰链在凹槽中心外侧多远。板子绕这条线翻起
         "plate_w":          0.780,  # 板宽。要基本铺满内区（内区宽 gold_inner×2 = 0.800），
                                     # 留太多会从两侧露出底板的深色，看着像一圈黑边
@@ -634,10 +637,17 @@ def build_spring(root):
     # 用暗色材质，所以是一条沟；做成凸起的条就成了横在板上的梁。
     ch_y = -inner + P["channel_from_edge"]
     bed_top = top - P["plate_thick"]          # 槽底 = 底板上表面
-    box("Channel", (0, ch_y, bed_top + P["channel_h"] * 0.5),
-        (P["channel_w"], P["channel_d"], P["channel_h"]), "board_recess", frame)
-    box("Glow", (0, ch_y, bed_top + P["channel_h"] + P["glow_h"] * 0.5),
-        (P["glow_w"], P["glow_d"], P["glow_h"]), "board_accent", frame)
+    if P["glow_round"]:
+        # 圆轴：直接躺在凹槽里，本身就是可见的那个件 —— 不再在它下面垫一根暗色条。
+        # 原来是"暗色方条 + 上面盖一条蓝"，深色轴压在蓝块上不好看。
+        r = P["plate_thick"] * 0.5 * P["glow_radius_fill"]
+        cyl("Glow", (0, ch_y, bed_top + r), r, P["channel_w"], "board_accent", frame,
+            axis="x", sides=14)
+    else:
+        box("Channel", (0, ch_y, bed_top + 0.003),
+            (P["channel_w"], P["channel_d"], 0.006), "board_recess", frame)
+        box("Glow", (0, ch_y, bed_top + 0.006 + P["glow_h"] * 0.5),
+            (P["glow_w"], P["glow_d"], P["glow_h"]), "board_accent", frame)
     # 两端不再单独放螺栓：那两颗以前是八角柱，和新的方形角铆钉撞在一起，
     # 而且位置本来就和角铆钉重叠 —— 角铆钉已经起到那个作用了。
 
