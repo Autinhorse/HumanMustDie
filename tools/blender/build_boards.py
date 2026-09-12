@@ -95,9 +95,9 @@ PARAMS = {
         # 没有石缘（Kerb）—— 板子直接坐在地面上，金框外沿就是格子边
         "gold_outer":       0.500,  # 金框外沿 = 半个格子，正好顶到格子边，别超
         "gold_inner":       0.400,  # 金框内沿；两者之差 = 金框宽度（现 0.100）
-        "gold_top":         0.078,  # 金框高度（一级）
-        "gold_top_step":    0.008,  # 每级加高多少
-        "groove_width":     0.030,  # 金框内侧那圈暗凹槽的宽度。
+        "gold_top":         0.039,  # 金框高度（一级）。压得很矮，铆钉才明显高出一截
+        "gold_top_step":    0.004,  # 每级加高多少
+        "groove_width":     0.020,  # 金框内侧那圈暗凹槽的宽度。
                                     # 它负责把金框和内板分开，去掉的话整块板会糊成一片
         "groove_below":     0.014,  # 凹槽底面比内板低多少
         "goldline_width":   0.016,  # 二级起，金框外侧那道暗金细线的宽度
@@ -106,9 +106,11 @@ PARAMS = {
         "bolt_size":        0.155,  # 正方形边长（一级）
         "bolt_size_step":   0.008,  # 每级加大多少
         "bolt_cut":         0.3333, # 朝格子内侧那个角切斜角，下刀在两条边的这个比例处
-        "bolt_body_h":      0.098,  # 铆钉主体高度（比金框略高，才看得出是颗钉）
-        "bolt_cap_h":       0.028,  # 顶上那层收口的高度
-        "bolt_cap_scale":   0.72,   # 收口相对主体缩小多少（外角仍贴着格子边）
+        "bolt_body_h":      0.098,  # 铆钉主体高度。明显高过金框，两者才分得开
+        "bolt_cap_h":       0.028,  # 顶上那颗八角钉帽的高度
+        "bolt_cap_ratio":   0.25,   # 钉帽半径 ÷ bolt_size。
+                                    # 0.25 => 直径约等于 Bolt 边长的一半，
+                                    # 也就刚好不会越过朝内的那个斜角
         "plate_top":        0.062,  # 内板上表面。**所有活动件静止时都对齐到这个高度**
     },
 
@@ -422,13 +424,20 @@ def bracket_pts(outer, size, cut, sx, sy):
     return pts
 
 
-def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_scale, material):
-    """四角的方形铆钉：主体 + 顶上一层收口。收口只往内缩，外角照样贴着格子边。"""
+def bolts(name, parent, outer, size, cut, body_h, cap_h, cap_ratio, material):
+    """四角的方形铆钉 Bolt + 顶上一颗八角钉帽 BoltT。
+
+    钉帽居中放在正方形的中心（不是放在格子角上），半径 size*cap_ratio。
+    取 0.25 时直径约等于边长的一半 —— 中心到斜角的距离是 0.471*size，
+    所以这个半径怎么都不会越过朝内的那个斜角。
+    """
+    c = outer - size * 0.5          # 正方形的中心到原点的距离
     for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
         prism("%s%d" % (name, i), bracket_pts(outer, size, cut, sx, sy),
               0.0, body_h, material, parent, bevel=0.005)
-        prism("%sT%d" % (name, i), bracket_pts(outer, size * cap_scale, cut, sx, sy),
-              body_h, body_h + cap_h, material, parent, bevel=0.005)
+        cyl("%sT%d" % (name, i), (sx * c, sy * c, body_h + cap_h * 0.5),
+            size * cap_ratio, cap_h, material, parent,
+            sides=8, rot_z=math.radians(22.5))
 
 
 # ----------------------------------------------------------------- 共用的边框
@@ -464,7 +473,7 @@ def floor_frame(frame):
              0.0, gold_h + 0.010, "board_gold_dark")
     bolts("Bolt", frame, fp("gold_outer"),
           tier_val(fp("bolt_size"), fp("bolt_size_step")), fp("bolt_cut"),
-          fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_scale"), "board_gold")
+          fp("bolt_body_h"), fp("bolt_cap_h"), fp("bolt_cap_ratio"), "board_gold")
 
 
 def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.25):
