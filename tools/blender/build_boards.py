@@ -211,7 +211,10 @@ PARAMS = {
         "hinge_offset":     0.058,  # 铰链在凹槽中心外侧多远。板子绕这条线翻起
         "plate_w":          0.780,  # 板宽。要基本铺满内区（内区宽 gold_inner×2 = 0.800），
                                     # 留太多会从两侧露出底板的深色，看着像一圈黑边
-        "plate_margin":     0.012,  # 板前沿离内区边缘留多少
+        "plate_margin":     0.012,  # 板前沿离内区边缘留多少（open_edge 为 True 时不用）
+        "open_edge":        True,   # 自由端（铰链对面）那条金框条去掉、板延伸到格子边。
+                                    # 这样"哪一块会动"在任何角度都一眼看得出来 ——
+                                    # 板和金框挨着时，某些角度下分界线会完全看不见
         "plate_thick":      0.018,  # 和尖刺板的内板同厚
         "edge_outer":       0.390,  # 板边金线（方环）的外沿，要跟着 plate_w 走
         "edge_inner":       0.368,  # 和内沿
@@ -510,8 +513,9 @@ def arrow_pts(length, width, head, head_w):
             (0.0, L), (-hh, L - head), (-hw, L - head)]
 
 
-def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0)):
-    """方环：四条边框拼成。石缘和金框都用它。"""
+def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0), skip=-1):
+    """方环：四条边框拼成。石缘和金框都用它。
+    skip 给 0~3 可以少做一条边（0=+Y, 1=-Y, 2=+X, 3=-X），用来开口。"""
     t = outer - inner
     cz = (z0 + z1) * 0.5
     h = z1 - z0
@@ -521,6 +525,8 @@ def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0
             (0, -(outer - t * 0.5), outer * 2, t),
             (outer - t * 0.5, 0, t, inner * 2),
             (-(outer - t * 0.5), 0, t, inner * 2))):
+        if i == skip:
+            continue
         box("%s%d" % (name, i), (cx0 + cx, cy0 + cy, cz), (sx, sy, h), material, parent, bevel)
 
 
@@ -574,7 +580,7 @@ def tier_val(base, step):
     return base + step * (_tier - 1)
 
 
-def floor_frame(frame):
+def floor_frame(frame, gold_skip=-1):
     """地面板共用的边框，从外到内：
 
       Gold      金框，外沿直接顶到格子边（没有石缘，板子就坐在地面上），
@@ -585,7 +591,8 @@ def floor_frame(frame):
     """
     # 金框从地面一直做到内板之上 —— 它要把整个叠层（底座 + 内板）都包住
     gold_h = fp("plate_top") + tier_val(fp("gold_above_plate"), fp("gold_above_step"))
-    ring("Gold", frame, fp("gold_outer"), fp("gold_inner"), 0.0, gold_h, "board_gold")
+    ring("Gold", frame, fp("gold_outer"), fp("gold_inner"), 0.0, gold_h, "board_gold",
+         skip=gold_skip)
     if _tier >= 2:
         ring("GoldLine", frame, fp("gold_inner") + fp("goldline_width"), fp("gold_inner"),
              0.0, gold_h + 0.010, "board_gold_dark")
@@ -623,7 +630,8 @@ def build_spring(root):
     """
     P = PARAMS["spring"]
     frame = joint("Frame", (0, 0, 0), root)
-    floor_frame(frame)
+    # 自由端在 -Y（铰链在 +Y），对应 ring 的第 1 条边
+    floor_frame(frame, gold_skip=1 if P["open_edge"] else -1)
 
     top = fp("plate_top")
     inner = fp("gold_inner")
@@ -635,7 +643,10 @@ def build_spring(root):
     # 弹出侧（-Y）的凹槽 + 发光条。设计图里这条是弹簧板最好认的特征，
     # 说明这一侧是铰链、往对面弹。注意它是**凹**进去的：从地面做到板面高度、
     # 用暗色材质，所以是一条沟；做成凸起的条就成了横在板上的梁。
-    ch_y = -inner + P["channel_from_edge"]
+    # 铰链放在**箭头指向的那一侧**（+Y）。板绕铰链翻起时，切向速度的水平分量
+    # 是朝铰链那侧的 —— 铰链在哪边就往哪边甩。放在反方向的话，模型的运动方式
+    # 和游戏实际的推力方向（沿 facing，也就是箭头）是拧着的。
+    ch_y = inner - P["channel_from_edge"]
     bed_top = top - P["plate_thick"]          # 槽底 = 底板上表面
     if P["glow_round"]:
         # 圆轴：直接躺在凹槽里，本身就是可见的那个件 —— 不再在它下面垫一根暗色条。
@@ -652,15 +663,30 @@ def build_spring(root):
     # 而且位置本来就和角铆钉重叠 —— 角铆钉已经起到那个作用了。
 
     # 板本体：铰链在凹槽外沿，静止时上表面和内板齐平
-    hinge_y = ch_y + P["hinge_offset"]
+    hinge_y = ch_y - P["hinge_offset"]
     mover = joint("Mover", (0, hinge_y, 0.0), root)
-    depth = inner - P["plate_margin"] - hinge_y
-    cy = depth * 0.5
+    # 板从铰链往 -Y 伸展（铰链在 +Y 侧），所以 cy 是负的。
+    # 开口时一直伸到格子边，把原来金框条占的位置补上。
+    var_far = -fp("gold_outer") if P["open_edge"] else -inner + P["plate_margin"]
+    depth = hinge_y - var_far
+    cy = -depth * 0.5
     box("Plate", (0, cy, top - P["plate_thick"] * 0.5), (P["plate_w"], depth, P["plate_thick"]),
         "board_plate", mover)
-    ring("PlateEdge", mover, P["edge_outer"], P["edge_inner"],
-         top - P["plate_thick"], top + 0.002,
-         "board_gold" if _tier >= 2 else "board_gold_dark", center=(0, cy))
+    # 板边金线：板现在是长方形、而且自由端开口，不能再用方环画
+    # （方环会在板面上留一条和板边对不上的线）。按板的实际矩形来，
+    # 开口那一边不画。
+    ew = P["edge_outer"] - P["edge_inner"]
+    hw, hd = P["plate_w"] * 0.5, depth * 0.5
+    ez0, ez1 = top - P["plate_thick"], top + 0.002
+    emat = "board_gold" if _tier >= 2 else "board_gold_dark"
+    edges = [("H", 0.0, cy + hd - ew * 0.5, hw * 2, ew),          # 铰链那一侧
+             ("R", hw - ew * 0.5, cy, ew, hd * 2),
+             ("L", -(hw - ew * 0.5), cy, ew, hd * 2)]
+    if not P["open_edge"]:
+        edges.append(("F", 0.0, cy - hd + ew * 0.5, hw * 2, ew))  # 自由端
+    for nm, ex, ey, sx, sy in edges:
+        box("PlateEdge" + nm, (ex, ey, (ez0 + ez1) * 0.5), (sx, sy, ez1 - ez0),
+            emat, mover, bevel=0.004)
 
     prism("Arrow", place(arrow_pts(P["arrow_len"], P["arrow_shaft_w"],
                                    P["arrow_head_len"], P["arrow_head_w"]), (0, cy)),
