@@ -144,8 +144,8 @@
 
   "board": {
     "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝。ao_* 是烘焙进顶点色的环境光遮蔽：ao_corner 管墙角、ao_side 管竖直面底部。",
-    "ao_subdiv": 4,
-    "ao_radius": 1.25,
+    "ao_subdiv": 6,
+    "ao_radius": 0.55,
     "ao_corner": 0.55,
     "ao_side": 0.32,
     "grid_line_width": 0.07,

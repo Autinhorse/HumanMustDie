@@ -133,12 +133,14 @@ func _touches_open(cell: Vector2i) -> bool:
 
 ## 一格地面：整格的缝色打底 + 稍微抬起、四周内缩的面色。出细缝但保持共面，不产生凸块。
 func _ground_tile(st: SurfaceTool, cell: Vector2i, center: Vector3, color: Color) -> void:
-	# 缝色打底：整格一块，不用细分（大部分会被面色盖住）
+	# 缝色和面色都按同样的细分画，否则缝线不会跟着变暗，会在暗部里留下一张亮网格
 	if _line_w > 0.0:
-		_top_quad(st, center, _cs, 0.0, _c_line, _corner_ao(cell))
-	# 面色细分成 N×N 小块 —— 一格一个四边形的话，AO 只能在四个角取值，
-	# 暗部会被摊成两米宽的糊；细分之后才能贴住墙根。
-	var size: float = _cs - _line_w
+		_subdiv_quad(st, center, _cs, 0.0, _c_line)
+	_subdiv_quad(st, center, _cs - _line_w, _lift, color)
+
+## 把一格切成 N×N 小块，每个顶点单独算遮蔽。
+## 一格一个四边形时 AO 只能在四个角取值，暗部会被摊成两米宽的糊。
+func _subdiv_quad(st: SurfaceTool, center: Vector3, size: float, y: float, color: Color) -> void:
 	var n := _ao_subdiv
 	var step: float = size / float(n)
 	var x0: float = center.x - size * 0.5
@@ -150,12 +152,13 @@ func _ground_tile(st: SurfaceTool, cell: Vector2i, center: Vector3, color: Color
 			var bx: float = ax + step
 			var bz: float = az + step
 			_quad(st,
-				Vector3(ax, _lift, az), Vector3(bx, _lift, az),
-				Vector3(bx, _lift, bz), Vector3(ax, _lift, bz), color,
+				Vector3(ax, y, az), Vector3(bx, y, az),
+				Vector3(bx, y, bz), Vector3(ax, y, bz), color,
 				PackedFloat32Array([_ao_at(ax, az), _ao_at(bx, az), _ao_at(bx, bz), _ao_at(ax, bz)]))
 
-## 地面上任意一点的遮蔽：看周围几格里有多少"高出地面的东西"，按距离衰减累加。
-## 这样暗部是从墙根往外柔和铺开，而不是整格一个亮度。
+## 地面上任意一点的遮蔽：取到最近遮挡物的距离衰减。
+## 注意是取最大值不是累加 —— 累加的话墙中段会被好几格叠满、端头只有一格，
+## 两者亮度差很大，墙的两端就会出现明显的突变。
 func _ao_at(x: float, z: float) -> float:
 	if _ao_corner <= 0.0:
 		return 1.0
@@ -173,25 +176,11 @@ func _ao_at(x: float, z: float) -> float:
 			var ex: float = max(absf(x - cc.x) - half, 0.0)
 			var ez: float = max(absf(z - cc.z) - half, 0.0)
 			var d: float = sqrt(ex * ex + ez * ez)
-			occ += max(0.0, 1.0 - d / _ao_radius)
-	return 1.0 - _ao_corner * clampf(occ, 0.0, 1.0)
-
-## 四个角各看两条边 + 一个斜角有没有挡住自己，挡得越多越暗（经典的方块地形 AO）
-func _corner_ao(cell: Vector2i) -> PackedFloat32Array:
-	if _ao_corner <= 0.0:
-		return PackedFloat32Array()
-	var out := PackedFloat32Array()
-	# 顺序要和 _top_quad 的 a/b/c/d 对上
-	for d in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, 1)]:
-		var n := 0
-		if _blocks(cell + Vector2i(d.x, 0)):
-			n += 1
-		if _blocks(cell + Vector2i(0, d.y)):
-			n += 1
-		if n < 2 and _blocks(cell + d):
-			n += 1
-		out.append(1.0 - _ao_corner * (float(n) / 3.0))
-	return out
+			occ = max(occ, 1.0 - d / _ao_radius)
+	# 平滑一下，贴墙处最重、外沿收得干净
+	occ = clampf(occ, 0.0, 1.0)
+	occ = occ * occ * (3.0 - 2.0 * occ)
+	return 1.0 - _ao_corner * occ
 
 ## 高出地面、会投下遮蔽的格子
 func _blocks(cell: Vector2i) -> bool:
