@@ -169,7 +169,13 @@
     "outline_strength": 0.95,
     "outline_fade_start": 30.0,
     "outline_fade_end": 52.0,
-    "outline_depth_fade": 120.0
+    "outline_depth_fade": 120.0,
+    "reflection_sky_enabled": true,
+    "refl_sky_top": "#9EB8DB",
+    "refl_sky_horizon": "#EEF2F6",
+    "refl_ground": "#57544E",
+    "refl_ground_horizon": "#9E9A92",
+    "refl_energy": 1.0
   },
   "board": {
     "_comment": "地面共面平铺，只用细缝分格；grid_line_width 设 0 就是完全无缝。ao_* 是烘焙进顶点色的环境光遮蔽：ao_corner 管墙角、ao_side 管竖直面底部。",

@@ -98,6 +98,18 @@ func _world(cs: float) -> void:
 	e.ssao_radius = float(ec.get("ssao_radius", 1.0))
 	e.ssao_intensity = float(ec.get("ssao_intensity", 2.6))
 	e.ssao_power = float(ec.get("ssao_power", 2.0))
+	# 和 main.gd 一样挂一个只给反射用的天空，否则这里的金属件看起来和游戏里不一样
+	if bool(ec.get("reflection_sky_enabled", true)):
+		var sky_mat := ProceduralSkyMaterial.new()
+		sky_mat.sky_top_color = Cfg.to_color(ec.get("refl_sky_top"), Color(0.62, 0.72, 0.86))
+		sky_mat.sky_horizon_color = Cfg.to_color(ec.get("refl_sky_horizon"), Color(0.93, 0.95, 0.97))
+		sky_mat.ground_bottom_color = Cfg.to_color(ec.get("refl_ground"), Color(0.34, 0.33, 0.31))
+		sky_mat.ground_horizon_color = Cfg.to_color(ec.get("refl_ground_horizon"), Color(0.62, 0.60, 0.56))
+		sky_mat.energy_multiplier = float(ec.get("refl_energy", 1.0))
+		var sky := Sky.new()
+		sky.sky_material = sky_mat
+		e.sky = sky
+		e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.environment = e
 	add_child(env)
 

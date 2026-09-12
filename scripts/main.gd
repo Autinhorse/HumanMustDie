@@ -255,6 +255,22 @@ func _make_environment(env_cfg: Dictionary) -> Environment:
 	e.ambient_light_color = _hex(env_cfg, "ambient_color", _hex(env_cfg, "sky_horizon", Color(0.65, 0.76, 0.75)))
 	e.ambient_light_energy = _ec(env_cfg, "ambient_energy", 0.85)
 
+	# 只给反射用的天空：背景仍然是纯色（正交相机下显示程序化天空会出一条斜带），
+	# 但 reflection_source 指向天空以后，金属件才有东西可反射 ——
+	# 没有这一步，金属反射的是一块纯色，金属度调多高都还是"塑料"。
+	if bool(env_cfg.get("reflection_sky_enabled", true)):
+		var sky_mat := ProceduralSkyMaterial.new()
+		sky_mat.sky_top_color = _hex(env_cfg, "refl_sky_top", Color(0.62, 0.72, 0.86))
+		sky_mat.sky_horizon_color = _hex(env_cfg, "refl_sky_horizon", Color(0.93, 0.95, 0.97))
+		sky_mat.ground_bottom_color = _hex(env_cfg, "refl_ground", Color(0.34, 0.33, 0.31))
+		sky_mat.ground_horizon_color = _hex(env_cfg, "refl_ground_horizon", Color(0.62, 0.60, 0.56))
+		sky_mat.sun_angle_max = 30.0
+		sky_mat.energy_multiplier = _ec(env_cfg, "refl_energy", 1.0)
+		var sky := Sky.new()
+		sky.sky_material = sky_mat
+		e.sky = sky
+		e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+
 	match String(env_cfg.get("tonemap", "filmic")):
 		"linear":
 			e.tonemap_mode = Environment.TONE_MAPPER_LINEAR

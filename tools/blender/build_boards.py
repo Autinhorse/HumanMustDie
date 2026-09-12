@@ -132,6 +132,14 @@ PARAMS = {
                                     # 只有四个角的话 AO 只能在整面上线性插值，
                                     # 结果就是整块零件一起变暗，而不是接缝处出暗角。
         "subdiv_passes":    5,      # 最多切几轮
+        # 分材质权重：金属件给低权重。金框是一条又薄又窄的环，紧挨着比它高的内板，
+        # AO 会"正确地"把整条压暗，结果和四角凸出去的铆钉差出一个色。
+        # 凹槽、井壁这些该暗的地方不受影响。
+        "per_material": {
+            "board_gold":      0.30,
+            "board_gold_dark": 0.40,
+            "board_accent":    0.60,
+        },
     },
 
     # ---------------- 尖刺板 ----------------
@@ -239,12 +247,13 @@ def mat(name):
     c = ACCENT[_tier] if name == "board_accent" else COLORS[name]
     b.inputs["Base Color"].default_value = to_linear(c)
     # 等级色不能太光滑：朝上的平面（箭头、叶片）会被高光烧白，紫色最明显
-    b.inputs["Roughness"].default_value = 0.38 if name == "board_gold" else (
+    # 金要够光滑反射才锐，金属感主要来自这里 + 环境的反射天空
+    b.inputs["Roughness"].default_value = 0.24 if name == "board_gold" else (
         0.48 if name == "board_accent" else 0.82)
     if "Metallic" in b.inputs:
-        # 金属度别给高：Godot 那边只有环境色、没有反射探针，metallic 0.85 的金
-        # 直接渲成暗褐色。0.3 在 Blender 预览和游戏里都还是金色。
-        b.inputs["Metallic"].default_value = 0.30 if name.startswith("board_gold") else 0.0
+        # 环境已经挂了只给反射用的天空，金属件有东西可反射了，
+        # 金属度可以给回高值 —— 之前压到 0.3 是因为没有反射，高金属度会渲成暗褐色。
+        b.inputs["Metallic"].default_value = 0.80 if name.startswith("board_gold") else 0.0
     # 宝石和发光条微微发光。强度别给大，Standard 视图变换不做色调映射，
     # 给到 1.0 以上直接烧成白的，等级色就看不出来了。
     if name in EMISSIVE and "Emission Color" in b.inputs:
@@ -857,12 +866,15 @@ def bake_ao():
     _bake_group(frame, mover, cfg["samples"])
     _bake_group(mover, frame, cfg["samples"])
 
-    # 调强度 + 兜底，避免角落烘成纯黑
-    k, floor = cfg["strength"], cfg["floor"]
+    # 调强度 + 兜底，避免角落烘成纯黑。强度按材质加权。
+    floor = cfg["floor"]
+    per = cfg.get("per_material", {})
     for ob in meshes:
         col = ob.data.color_attributes.active_color
         if col is None:
             continue
+        mname = ob.data.materials[0].name if ob.data.materials else ""
+        k = cfg["strength"] * float(per.get(mname, 1.0))
         for d in col.data:
             v = 1.0 - (1.0 - d.color[0]) * k
             v = floor + (1.0 - floor) * v
