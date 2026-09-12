@@ -116,10 +116,10 @@ PARAMS = {
         "bolt_cap_ratio":   0.3333, # 钉帽半径 ÷ bolt_size。
                                     # 上限是 0.471（正方形中心到朝内斜角的距离），
                                     # 超过就会切出斜角外面去
-        "plate_top":        0.110,  # 内板上表面。**它同时是竖井的深度上限** ——
+        "plate_top":        0.027,  # 内板上表面。**它同时是竖井的深度上限** ——
                                     # 游戏里 y=0 以下被地板挡住，井最深只能到这里。
-                                    # 想让洞看起来是洞而不是浅坑，就得抬这个值，
-                                    # 代价是整块板在地面上凸得更高。
+                                    # 抬高 = 洞更深，但整块板在地面上也凸得更高，
+                                    # 两者是直接矛盾的，只能取舍。
                                     # **所有活动件静止时都对齐到这个高度**
     },
 
@@ -164,17 +164,24 @@ PARAMS = {
         "base_depth":       0.300,  # 砖体往地下的厚度。刺收回去要能整根藏进去
         "plate_inset":      0.000,  # 内板外沿从 gold_inner 再往里缩多少。
                                     # 0 = 内板直接顶到金框内沿，两者相接
-        "plate_thick":      0.039,  # 内板这一层的厚度。板底 = plate_top - plate_thick，
-                                    # 底座顶面就顶在那里（也就是槽底），槽深 = 这个值
-        "plate_rim":        0.167,  # 内板靠四边那圈的宽度。
-                                    # 保持和中间十字条同宽（= cross_half × 2），
-                                    # 加宽它 = 洞变窄 = 深宽比变大 = 更像个洞
-        "cross_half":       0.0833, # 十字隔条的半宽
+        "plate_thick":      0.018,  # 内板这一层的厚度。板底 = plate_top - plate_thick
+        "hole_count":       3,      # 每边几个洞（3 = 3×3 共九个）
+        "plate_rim":        0.080,  # 内板靠四边那圈的宽度。
+                                    # 按约定等于隔条全宽（= cross_half × 2），
+                                    # 洞口宽度由它和 hole_count 反算出来
+        "cross_half":       0.040,  # 隔条的半宽
         "hole_bottom":      0.002,  # 方竖井的井底高度。压到 0 附近就行 ——
                                     # 游戏里 y=0 以下会被地板挡住，可见井深最多
                                     # 就是 plate_top，想要更深的井得把 plate_top 抬高
-        "cap_aspect":       3.0,    # 锥尖的**高宽比**。3 = 高是宽的三倍，很尖。
-                                    # 高度由它和刺宽算出来，不再单独给高度
+        "cap_aspect":       0.45,  # 锥尖的**高宽比**（高 ÷ 宽）。
+                                    # **别调高**：尖锥在井口露出的横截面极细，
+                                    # 而刺的颜色是用来标等级的，看不见等于功能失效。
+                                    # 实测静止时能看到的青色像素（spike_fill 一起调）：
+                                    #   宽0.60 锥4.00 -> 0 个（完全看不见）
+                                    #   宽0.42 锥1.30 -> 74 个
+                                    #   宽0.48 锥0.90 -> 145 个
+                                    #   宽0.60 锥0.45 -> 501 个 <- 参考图就是这种扁宽锥
+                                    # 想要"长而尖"靠 spike_len（刺杆），不是靠这个
         "spike_fill":       0.60,   # 刺的宽度 ÷ 井口宽度。留出的缝正好露出井壁
         "spike_len":        0.450,  # 刺的**总长**（锥尖 + 刺杆）。
                                     # 决定扎出来能有多长，也就是井要多深才装得下
@@ -679,11 +686,21 @@ def build_spikes(root):
     bottom = top - P["plate_thick"]   # 板底
     floor_z = P["hole_bottom"]        # 井底
 
+    # 洞的排布：靠边一圈 rim，中间 N 个洞、N-1 条隔条。
+    # 洞宽由总宽反算，这样改 hole_count 或 rim 都不用手算坐标。
+    n = int(P["hole_count"])
     div = P["cross_half"]
     rim = P["plate_rim"]
-    edge = inner - rim
-    xs = [-inner, -edge, -div, div, edge, inner]
-    holes = [(1, 1), (1, 3), (3, 1), (3, 3)]
+    hole_w = (2.0 * inner - 2.0 * rim - (n - 1) * 2.0 * div) / n
+    xs = [-inner, -inner + rim]
+    for i in range(n):
+        xs.append(xs[-1] + hole_w)
+        if i < n - 1:
+            xs.append(xs[-1] + 2.0 * div)
+    xs.append(inner)
+    # 洞落在奇数号条带上（0 号是 rim，之后 洞/隔条 交替）
+    idx = [1 + 2 * i for i in range(n)]
+    holes = [(i, j) for i in idx for j in idx]
 
     # 内板和底座用**同一个洞网格**，方竖井就这么一路开到井底。
     # 拿外圈 + 十字拼的话每块都会被倒角修出一圈棱，板面上会看到分界线，
@@ -694,8 +711,6 @@ def build_spikes(root):
     box("BaseFloor", (0, 0, floor_z - P["base_depth"] * 0.5),
         (inner * 2, inner * 2, P["base_depth"]), "board_base", frame)
 
-    hole_w = edge - div              # 方竖井的**全宽**
-    d = div + hole_w * 0.5           # 井心距原点
 
     # 刺：锥尖 + 长刺杆。静止时锥尖齐板面，刺杆填满可见的那段井，
     # 剩下的部分伸到井底以下（被 BaseFloor 挡住）。
@@ -704,7 +719,9 @@ def build_spikes(root):
     cap_h = spike_w * P["cap_aspect"]   # 高宽比直接决定尖不尖
     cone_base = tip - cap_h          # 锥尖底面 = 刺杆顶面
     shaft_len = P["spike_len"] - cap_h
-    for i, (sx, sy) in enumerate(((d, d), (-d, d), (d, -d), (-d, -d))):
+    # 每个洞的中心 = 那条带的中点
+    centers = [(xs[k] + xs[k + 1]) * 0.5 for k in idx]
+    for i, (sx, sy) in enumerate([(a, b) for a in centers for b in centers]):
         box("SpikeShaft%d" % i, (sx, sy, cone_base - shaft_len * 0.5),
             (spike_w, spike_w, shaft_len), "board_accent", mover)
         pyramid("Spike%d" % i, (sx, sy, cone_base), spike_w, cap_h, "board_accent", mover)
