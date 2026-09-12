@@ -68,6 +68,7 @@ COLORS = {
     "board_stone":     (0.92, 0.90, 0.87),
     "board_plate":     (0.750, 0.722, 0.690),
     "board_recess":    (0.075, 0.105, 0.130),
+    "board_base":      (0.545, 0.520, 0.495),  # 底座：比 plate 略深一点的灰，不是黑
     "board_gold":      (0.790, 0.600, 0.330),
     "board_gold_dark": (0.34, 0.25, 0.14),
     "board_accent":    (1.0, 1.0, 1.0),      # 运行时按等级替换
@@ -113,7 +114,9 @@ PARAMS = {
         "bolt_cap_ratio":   0.3333, # 钉帽半径 ÷ bolt_size。
                                     # 上限是 0.471（正方形中心到朝内斜角的距离），
                                     # 超过就会切出斜角外面去
-        "plate_top":        0.062,  # 内板上表面。**所有活动件静止时都对齐到这个高度**
+        "plate_top":        0.078,  # 内板上表面。**所有活动件静止时都对齐到这个高度**
+                                    # = gold_top × 2：设计图里 plate 这一层的厚度
+                                    # 大约是金框高度的两倍，板底坐在地面（z=0）上
     },
 
     # ---------------- 尖刺板 ----------------
@@ -126,7 +129,6 @@ PARAMS = {
                                     # 现在和中间十字条同宽（cross_half × 2 = 0.096），
                                     # 四个洞因此往内收，边框看着和十字一样粗
         "cross_half":       0.048,  # 十字隔条的半宽
-        "liner_width":      0.028,  # 槽壁暗色内衬的厚度
         "cap_fill":         0.60,   # 锥体宽度 ÷ 槽口宽度。
                                     # 给到 0.8 会把槽底的深色全盖住，看着就是四块平方片
         "shaft_fill":       0.80,   # 刺杆宽度 ÷ 锥体底宽
@@ -315,6 +317,59 @@ def prism(name, pts, a0, a1, material, parent, bevel=0.006, axis="z"):
     f.append(tuple(range(n - 1, -1, -1)))
     f.append(tuple(range(n, 2 * n)))
     return add(name, v, f, material, parent, bevel)
+
+
+def slab_with_holes(name, xs, ys, hole_cells, z0, z1, material, parent, bevel=0.008):
+    """一整块带方洞的板，做成**单个网格**。
+
+    xs / ys 是分带的边界坐标（n+1 个值分成 n 条带），hole_cells 里是要挖空的
+    格子下标 (i, j)。
+
+    为什么非要合成一个网格：拿几个盒子拼的话，每个盒子都会被倒角修出一圈棱，
+    板面上就会看到一条条分界线。合成单个网格以后，内部那些边两侧的面是共面的
+    （夹角 0），按角度限制的倒角会自动跳过它们，只倒真正的轮廓边。
+    """
+    nxs, nys = len(xs), len(ys)
+
+    def vid(i, j, top):
+        return (0 if top else nxs * nys) + i * nys + j
+
+    verts = []
+    for top in (True, False):
+        z = z1 if top else z0
+        for i in range(nxs):
+            for j in range(nys):
+                verts.append((xs[i], ys[j], z))
+
+    faces = []
+    holes = set(hole_cells)
+    for i in range(nxs - 1):
+        for j in range(nys - 1):
+            if (i, j) in holes:
+                continue
+            faces.append((vid(i, j, True), vid(i + 1, j, True),
+                          vid(i + 1, j + 1, True), vid(i, j + 1, True)))
+            faces.append((vid(i, j + 1, False), vid(i + 1, j + 1, False),
+                          vid(i + 1, j, False), vid(i, j, False)))
+
+    # 外圈侧壁：沿外边界**逆时针**走一圈，法线朝外
+    ring = ([(i, 0) for i in range(nxs - 1)] +
+            [(nxs - 1, j) for j in range(nys - 1)] +
+            [(i, nys - 1) for i in range(nxs - 1, 0, -1)] +
+            [(0, j) for j in range(nys - 1, 0, -1)])
+    for k in range(len(ring)):
+        a, b = ring[k], ring[(k + 1) % len(ring)]
+        faces.append((vid(a[0], a[1], False), vid(b[0], b[1], False),
+                      vid(b[0], b[1], True), vid(a[0], a[1], True)))
+
+    # 洞壁：沿洞边界**顺时针**走，法线才朝洞里
+    for (i, j) in hole_cells:
+        loop = [(i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j)]
+        for k in range(4):
+            a, b = loop[k], loop[(k + 1) % 4]
+            faces.append((vid(a[0], a[1], False), vid(b[0], b[1], False),
+                          vid(b[0], b[1], True), vid(a[0], a[1], True)))
+    return add(name, verts, faces, material, parent, bevel)
 
 
 def pyramid(name, center, base, height, material, parent, bevel=0.004):
@@ -552,11 +607,9 @@ def build_spring(root):
 def build_spikes(root):
     """尖刺板。部件：
 
-      固定（Frame）  Kerb / Gold / Groove / Bolt  外框
-                     Base        砖体，实心，顶面就是槽底
-                     Plate       浅灰内板的外圈
-                     PlateCrossX/Y  十字隔条，和外圈一起围出四个方槽
-                     Liner       槽壁的暗色内衬（只有槽底暗的话看不出深度）
+      固定（Frame）  Gold / Groove / Bolt  外框
+                     Base        底座，比内板略深的灰，顶面就是槽底
+                     Plate       浅灰内板，**一整块**带四个方洞的板
       活动（Mover）  Spike       锥体刺尖（等级色）
                      SpikeShaft  刺杆，静止时整根藏在砖体里
 
@@ -570,23 +623,23 @@ def build_spikes(root):
 
     inner = fp("gold_inner") - P["plate_inset"]
     top = fp("plate_top")
-    # 砖体按**金框内沿**铺满，不是按内板外沿 —— 要连凹槽底下也垫上
+    # 底座：顶面就是槽底，按**金框内沿**铺满，连凹槽底下也垫上。
+    # 顶面必须停在 z=0 —— 游戏里地面以下会被地板挡住，槽底要是沉到 0 以下，
+    # 从洞里看到的就是游戏地板而不是底座。
     box("Base", (0, 0, -P["base_depth"] * 0.5),
-        (fp("gold_inner") * 2, fp("gold_inner") * 2, P["base_depth"]), "board_recess", frame)
+        (fp("gold_inner") * 2, fp("gold_inner") * 2, P["base_depth"]), "board_base", frame)
 
+    # 内板：一整块带四个方洞的板。拿外圈 + 十字拼的话，每块都会被倒角修出一圈棱，
+    # 板面上就会看到分界线。
     div = P["cross_half"]
     rim = P["plate_rim"]
-    cz, h = top * 0.5, top
-    ring("Plate", frame, inner, inner - rim, 0.0, top, "board_plate")
-    box("PlateCrossX", (0, 0, cz), (inner * 2, div * 2, h), "board_plate", frame)
-    box("PlateCrossY", (0, 0, cz), (div * 2, inner * 2, h), "board_plate", frame)
+    edge = inner - rim
+    xs = [-inner, -edge, -div, div, edge, inner]
+    slab_with_holes("Plate", xs, xs, [(1, 1), (1, 3), (3, 1), (3, 3)],
+                    0.0, top, "board_plate", frame)
 
-    hole_w = (inner - rim) - div     # 一个方槽的**全宽**
+    hole_w = edge - div              # 一个方槽的**全宽**
     d = div + hole_w * 0.5           # 槽中心距原点
-    hw = hole_w * 0.5
-    for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
-        ring("Liner%d" % i, frame, hw, hw - P["liner_width"], 0.0, top, "board_recess",
-             center=(d * sx, d * sy))
 
     cap_w = hole_w * P["cap_fill"]
     tip = top - P["tip_below_plate"]
