@@ -121,7 +121,7 @@ func build(p_grid: HGrid, entrance_cells: Array) -> void:
 	add_child(_board)
 
 	_build_core(pal)
-	_build_void_pit()
+	_build_under_clouds()
 
 # ---------------------------------------------------------------- 构件
 
@@ -279,64 +279,49 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, colo
 		st.set_color(Color(color.r * f, color.g * f, color.b * f, color.a))
 		st.add_vertex(pts[k])
 
-## 被岛围住的空地格底下补一层暗面 —— 否则从坑里看到的是天空，像"挖了个洞"。
-## 岛外的空地不画，悬浮感要留着。
-func _build_void_pit() -> void:
-	var cfg: Dictionary = Cfg.art.get("void_pit", {})
+## 岛下方铺一层云。参考图里坑底不是一块暗板，而是岩体一直往下延伸、
+## 再往下被云挡住 —— 所以这里只铺云，让岩体自己去当"坑壁"。
+func _build_under_clouds() -> void:
+	var cfg: Dictionary = Cfg.art.get("under_clouds", {})
 	if not bool(cfg.get("enabled", true)):
-		return
-	var inner := _enclosed_void_cells()
-	if inner.is_empty():
-		return
-	var depth := float(cfg.get("depth", 7.0))
-
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	st.set_smooth_group(-1)
-	var col := _col(Cfg.art.get("void_pit", {}), "color", Color(0.24, 0.29, 0.33))
-	for c in inner:
-		var p := grid.cell_center(c)
-		_top_quad(st, Vector3(p.x, -depth, p.z), _cs, 0.0, col)
-	st.generate_normals()
-	var pit := MeshInstance3D.new()
-	pit.name = "VoidPit"
-	pit.mesh = st.commit()
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.vertex_color_is_srgb = true
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	pit.material_override = m
-	pit.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(pit)
-
-	# 坑里飘几团雾，遮住"平底"的感觉
-	var n := int(cfg.get("clouds", 8))
-	if n <= 0:
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(Cfg.art.get("rock", {}).get("seed", 20260911)) + 91
-	var cmat := StandardMaterial3D.new()
-	cmat.albedo_color = _col(cfg, "cloud_color", Color(0.62, 0.70, 0.74))
-	cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	for i in n:
-		var c: Vector2i = inner[rng.randi_range(0, inner.size() - 1)]
+
+	var mat := StandardMaterial3D.new()
+	var c := _col(cfg, "color", Color(0.86, 0.90, 0.91))
+	var alpha := float(cfg.get("alpha", 1.0))
+	mat.albedo_color = Color(c.r, c.g, c.b, alpha)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if alpha < 0.999:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+
+	var root := Node3D.new()
+	root.name = "UnderClouds"
+	add_child(root)
+
+	var margin := float(cfg.get("margin", 2.0)) * _cs
+	var w: float = float(grid.w) * _cs
+	var h: float = float(grid.h) * _cs
+	var yc := float(cfg.get("y_center", -9.5))
+	var ys := float(cfg.get("y_spread", 2.6))
+	for i in int(cfg.get("count", 42)):
 		var mi := MeshInstance3D.new()
 		var sp := SphereMesh.new()
-		var r := float(cfg.get("cloud_radius", 2.6)) * rng.randf_range(0.7, 1.3)
+		var r := rng.randf_range(float(cfg.get("radius_min", 2.6)), float(cfg.get("radius_max", 5.2)))
 		sp.radius = r
 		sp.height = r * 2.0
-		sp.radial_segments = 10
-		sp.rings = 5
+		sp.radial_segments = 14
+		sp.rings = 7
 		mi.mesh = sp
-		mi.material_override = cmat
+		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var p := grid.cell_center(c)
-		mi.position = Vector3(p.x + rng.randf_range(-1.0, 1.0), 
-			rng.randf_range(float(cfg.get("cloud_y_min", -16.0)), float(cfg.get("cloud_y_max", -6.0))),
-			p.z + rng.randf_range(-1.0, 1.0))
-		mi.scale = Vector3(1.0, 0.35, 1.0)
-		add_child(mi)
+		mi.position = Vector3(
+			rng.randf_range(-margin, w + margin),
+			yc + rng.randf_range(-ys, ys),
+			rng.randf_range(-margin, h + margin))
+		mi.scale = Vector3(1.0, float(cfg.get("flatten", 0.28)), 1.0)
+		root.add_child(mi)
 
 ## 从地图边缘往里灌水，灌不到的空地格就是被岛围住的坑
 func _enclosed_void_cells() -> Array[Vector2i]:

@@ -26,9 +26,9 @@
   "rock": {
     "_comment": "岛底岩柱：程序化生成，跟着地图走。同种子同地图=同一座岛",
     "seed": 20260911,
-    "solid_depth": 2.6,
-    "edge_depth_min": 1.0,
-    "edge_depth_max": 3.6,
+    "solid_depth": 3.0,
+    "edge_depth_min": 1.6,
+    "edge_depth_max": 5.2,
     "edge_long_chance": 0.55,
     "inner_depth_min": 0.4,
     "inner_depth_max": 1.2,
@@ -84,16 +84,18 @@
     "marker_radius_mul": 1.5
   },
 
-  "void_pit": {
-    "_comment": "被岛围住的空地格底下补一层暗面，坑才有深度；否则从洞里看到的是天空，像挖了个洞。岛外的空地不画，保持悬浮感。",
+  "under_clouds": {
+    "_comment": "岛下方铺一层云。坑里看到的应该是岩体一直往下延伸、再往下被云挡住，而不是一块暗底板。云铺在岛的投影范围内（含一圈外扩），所以从坑里和岛缘都看得到。",
     "enabled": true,
-    "depth": 3.4,
-    "color": "#2B3540",
-    "clouds": 8,
-    "cloud_color": "#9FB2BD",
-    "cloud_y_min": -9.0,
-    "cloud_y_max": -4.0,
-    "cloud_radius": 1.8
+    "count": 42,
+    "y_center": -9.5,
+    "y_spread": 2.6,
+    "radius_min": 2.6,
+    "radius_max": 5.2,
+    "flatten": 0.28,
+    "margin": 2.0,
+    "color": "#DCE6E8",
+    "alpha": 1.0
   },
 
   "core_fx": {
