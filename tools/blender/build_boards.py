@@ -532,15 +532,15 @@ def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0
             (outer - t * 0.5, 0, t, inner * 2),
             (-(outer - t * 0.5), 0, t, inner * 2)]
     # 开口那条的垂直方向两条要补长过去
+    grow = outer - inner
     if skip in (0, 1):
-        grow = outer - inner
-        off = grow * 0.5 * (-1 if skip == 0 else 1)
+        # 往**被跳过的那一侧**补长：skip=0 是 +Y 开口，就往 +Y 长
+        off = grow * 0.5 * (1 if skip == 0 else -1)
         for i in (2, 3):
             bx, by, bsx, bsy = bars[i]
             bars[i] = (bx, by + off, bsx, bsy + grow)
     elif skip in (2, 3):
-        grow = outer - inner
-        off = grow * 0.5 * (-1 if skip == 2 else 1)
+        off = grow * 0.5 * (1 if skip == 2 else -1)
         for i in (0, 1):
             bx, by, bsx, bsy = bars[i]
             bars[i] = (bx + off, by, bsx + grow, bsy)
