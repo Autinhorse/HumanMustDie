@@ -194,23 +194,24 @@ PARAMS = {
     # 弹出侧（-Y）有一条结构：深槽 Channel + 发光条 Glow + 两端螺栓 ChBolt。
     # 板子 Plate 绕这条结构的外沿翻起，箭头 Arrow 平嵌在板面里。
     "spring": {
-        "channel_from_edge": 0.080, # 结构条中心离内区边缘多远
-        "channel_w":        0.600,  # 深槽宽度（x 向）
-        "channel_d":        0.150,  # 深槽进深（y 向）
-        "channel_h":        0.052,  # 深槽高度
-        "glow_w":           0.520,  # 发光条尺寸
-        "glow_d":           0.072,
-        "glow_h":           0.030,
-        "glow_z":           0.048,  # 发光条中心高度
-        "chbolt_x":         0.325,  # 两端螺栓的 x 位置
-        "chbolt_r":         0.074,  # 深槽两端螺栓的半径
-        "chbolt_cap_r":     0.053,  # 螺栓顶上那圈收口的半径
-        "hinge_offset":     0.062,  # 铰链在结构条中心外侧多远。板子绕这条线翻起
-        "plate_w":          0.680,  # 板宽
+        "channel_from_edge": 0.075, # 凹槽中心离内区边缘多远
+        "channel_w":        0.620,  # 凹槽宽度（x 向）
+        "channel_d":        0.120,  # 凹槽进深（y 向）
+        # 铰链那一侧本来就没有板子盖着，天然就比板面低一截 —— 那里已经是凹槽了，
+        # 不需要再堆一个块。Channel 只是铺在槽底的一层暗色，Glow 叠在它上面。
+        # 老版本把 Channel 做成了从地面到板面的实心盒子，结果把 Glow 整个包在里面，
+        # 发光条完全看不见。
+        "channel_h":        0.006,  # 槽底那层暗色的厚度
+        "glow_w":           0.540,  # 发光条尺寸
+        "glow_d":           0.078,
+        "glow_h":           0.010,  # 发光条厚度。顶面要低于板面，才算嵌在槽里
+        "hinge_offset":     0.058,  # 铰链在凹槽中心外侧多远。板子绕这条线翻起
+        "plate_w":          0.780,  # 板宽。要基本铺满内区（内区宽 gold_inner×2 = 0.800），
+                                    # 留太多会从两侧露出底板的深色，看着像一圈黑边
         "plate_margin":     0.012,  # 板前沿离内区边缘留多少
-        "plate_thick":      0.044,
-        "edge_outer":       0.340,  # 板边金线（方环）的外沿
-        "edge_inner":       0.318,  # 和内沿
+        "plate_thick":      0.018,  # 和尖刺板的内板同厚
+        "edge_outer":       0.390,  # 板边金线（方环）的外沿，要跟着 plate_w 走
+        "edge_inner":       0.368,  # 和内沿
         "arrow_len":        0.500,  # 箭头总长
         "arrow_shaft_w":    0.150,  # 箭杆宽
         "arrow_head_len":   0.170,  # 箭头部分的长度
@@ -606,11 +607,11 @@ def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.
 def build_spring(root):
     """弹簧板。部件：
 
-      固定（Frame）  Kerb / Gold / Groove / Bolt  外框
-                     Channel  弹出侧的深槽
-                     Glow     深槽里的发光条（等级色）
-                     ChBolt   深槽两端的大螺栓
-      活动（Mover）  Plate      板本体，绕深槽外沿翻起
+      固定（Frame）  Gold / Bolt  外框
+                     Bed      板下面的底板，板翻起来以后露出来的就是它
+                     Channel  弹出侧的凹槽（暗色，陷下去的）
+                     Glow     凹槽里的发光条（等级色）
+      活动（Mover）  Plate      板本体，绕凹槽外沿翻起
                      PlateEdge  板边一圈金线
                      Arrow      平嵌在板面里的箭头（等级色）
                      Leaf       板面上的叶片
@@ -621,28 +622,34 @@ def build_spring(root):
     frame = joint("Frame", (0, 0, 0), root)
     floor_frame(frame)
 
-    # 弹出侧（-Y）的结构：深槽 + 发光条 + 两端螺栓。
-    # 设计图里这条又粗又显眼，是弹簧板最好认的特征，说明这一侧是铰链、往对面弹。
-    ch_y = -fp("gold_inner") + P["channel_from_edge"]
-    box("Channel", (0, ch_y, P["channel_h"] * 0.5),
-        (P["channel_w"], P["channel_d"], P["channel_h"]), "board_recess", frame)
-    box("Glow", (0, ch_y, P["glow_z"]), (P["glow_w"], P["glow_d"], P["glow_h"]),
-        "board_accent", frame)
-    for i, sx in enumerate((-1, 1)):
-        cyl("ChBolt%d" % i, (sx * P["chbolt_x"], ch_y, 0.050), P["chbolt_r"], 0.070,
-            "board_gold", frame, sides=8, rot_z=math.radians(22.5))
-        cyl("ChBoltT%d" % i, (sx * P["chbolt_x"], ch_y, 0.090), P["chbolt_cap_r"], 0.030,
-            "board_gold", frame, sides=8, rot_z=math.radians(22.5))
+    top = fp("plate_top")
+    inner = fp("gold_inner")
 
-    # 板本体：铰链在深槽外沿，静止时上表面和内板齐平
+    # 板下面的底板：板翻起来以后露出来的就是它。少了它板子是浮在空中的。
+    box("Bed", (0, 0, (top - P["plate_thick"]) * 0.5),
+        (inner * 2, inner * 2, top - P["plate_thick"]), "board_base", frame)
+
+    # 弹出侧（-Y）的凹槽 + 发光条。设计图里这条是弹簧板最好认的特征，
+    # 说明这一侧是铰链、往对面弹。注意它是**凹**进去的：从地面做到板面高度、
+    # 用暗色材质，所以是一条沟；做成凸起的条就成了横在板上的梁。
+    ch_y = -inner + P["channel_from_edge"]
+    bed_top = top - P["plate_thick"]          # 槽底 = 底板上表面
+    box("Channel", (0, ch_y, bed_top + P["channel_h"] * 0.5),
+        (P["channel_w"], P["channel_d"], P["channel_h"]), "board_recess", frame)
+    box("Glow", (0, ch_y, bed_top + P["channel_h"] + P["glow_h"] * 0.5),
+        (P["glow_w"], P["glow_d"], P["glow_h"]), "board_accent", frame)
+    # 两端不再单独放螺栓：那两颗以前是八角柱，和新的方形角铆钉撞在一起，
+    # 而且位置本来就和角铆钉重叠 —— 角铆钉已经起到那个作用了。
+
+    # 板本体：铰链在凹槽外沿，静止时上表面和内板齐平
     hinge_y = ch_y + P["hinge_offset"]
     mover = joint("Mover", (0, hinge_y, 0.0), root)
-    depth = fp("gold_inner") - P["plate_margin"] - hinge_y
+    depth = inner - P["plate_margin"] - hinge_y
     cy = depth * 0.5
-    top = fp("plate_top")
     box("Plate", (0, cy, top - P["plate_thick"] * 0.5), (P["plate_w"], depth, P["plate_thick"]),
         "board_plate", mover)
-    ring("PlateEdge", mover, P["edge_outer"], P["edge_inner"], top - 0.030, top + 0.003,
+    ring("PlateEdge", mover, P["edge_outer"], P["edge_inner"],
+         top - P["plate_thick"], top + 0.002,
          "board_gold" if _tier >= 2 else "board_gold_dark", center=(0, cy))
 
     prism("Arrow", place(arrow_pts(P["arrow_len"], P["arrow_shaft_w"],
