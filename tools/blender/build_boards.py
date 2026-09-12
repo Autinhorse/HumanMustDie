@@ -655,16 +655,7 @@ def build_spring(root):
     prism("Arrow", place(arrow_pts(P["arrow_len"], P["arrow_shaft_w"],
                                    P["arrow_head_len"], P["arrow_head_w"]), (0, cy)),
           top - P["arrow_sink"], top + 0.005, "board_accent", mover, bevel=0.004)
-    # 叶片也是平嵌的。设计图里一级就有两片，三级再加两片
-    for i, sx in enumerate((-1, 1)):
-        leaf("Leaf%d" % i, (sx * P["leaf_x"], cy + 0.115 * sx), P["leaf_len"],
-             P["leaf_width"], top - 0.008, top + 0.003, "board_gold", mover,
-             angle=math.radians(-30 * sx))
-    if _tier >= 3:
-        for i, sx in enumerate((-1, 1)):
-            leaf("Leaf%d" % (i + 2), (sx * (P["leaf_x"] + 0.030), cy - 0.20),
-                 0.130, 0.054, top - 0.008, top + 0.003,
-                 "board_gold", mover, angle=math.radians(30 * sx))
+    # 板面不放叶片装饰：留干净的一块，只有箭头
     return root
 
 
@@ -846,6 +837,9 @@ def subdivide_for_ao(max_edge, passes):
         bm = bmesh.new()
         bm.from_mesh(ob.data)
         before += len(bm.faces)
+        # 烘 AO 之前统一把法线摆正：法线朝里的话 Cycles 会以为射线打进实体，
+        # 那一面就会烘成全遮挡（弹簧板的板面就是这么烘黑的）。
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         for _ in range(passes):
             long_edges = [e for e in bm.edges if e.calc_length() > max_edge]
             if not long_edges:
@@ -930,7 +924,10 @@ def bake_ao():
     for ob in meshes:
         me = ob.data
         if not me.color_attributes:
-            me.color_attributes.new(name="Col", type="BYTE_COLOR", domain="CORNER")
+            # 必须用 FLOAT_COLOR（线性）。BYTE_COLOR 在 Blender 里是 sRGB，
+            # 导出 glTF 时会再做一次 sRGB->线性，AO 相当于被平方了一遍
+            # （实测写进去 0.407，导出成 0.141）。
+            me.color_attributes.new(name="Col", type="FLOAT_COLOR", domain="CORNER")
         me.color_attributes.active_color_index = 0
 
     frame = [o for o in meshes if _group_of(o) == "Frame"]
