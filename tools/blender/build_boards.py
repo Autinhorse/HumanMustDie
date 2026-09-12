@@ -69,7 +69,9 @@ COLORS = {
     "board_plate":     (0.750, 0.722, 0.690),
     "board_recess":    (0.075, 0.105, 0.130),
     "board_base":      (0.545, 0.520, 0.495),  # 底座：比 plate 略深一点的灰，不是黑
-    "board_gold":      (0.790, 0.600, 0.330),
+    # 注意：这是**棱上**的亮度。平面会被顶点色的棱高光压到约 0.62 倍，
+    # 所以看上去的"金色"比这个值暗一截，别直接拿设计图吸到的中间色填这里。
+    "board_gold":      (0.960, 0.790, 0.470),
     "board_gold_dark": (0.34, 0.25, 0.14),
     "board_accent":    (1.0, 1.0, 1.0),      # 运行时按等级替换
 }
@@ -140,6 +142,13 @@ PARAMS = {
             "board_gold_dark": 0.40,
             "board_accent":    0.60,
         },
+        # 棱高光：平面相对棱压暗多少（0 = 关掉）。分材质给，金属件给大一点。
+        # 顶点色只能压暗不能提亮，所以金的基础色是按"棱上不压暗"来定的。
+        "edge_gain": {
+            "board_gold":      0.38,
+            "board_gold_dark": 0.25,
+        },
+        "edge_sharp":       6.0,    # 凸度到亮度的映射斜率，越大亮边越窄
     },
 
     # ---------------- 尖刺板 ----------------
@@ -248,12 +257,12 @@ def mat(name):
     b.inputs["Base Color"].default_value = to_linear(c)
     # 等级色不能太光滑：朝上的平面（箭头、叶片）会被高光烧白，紫色最明显
     # 金要够光滑反射才锐，金属感主要来自这里 + 环境的反射天空
-    b.inputs["Roughness"].default_value = 0.24 if name == "board_gold" else (
+    b.inputs["Roughness"].default_value = 0.15 if name == "board_gold" else (
         0.48 if name == "board_accent" else 0.82)
     if "Metallic" in b.inputs:
         # 环境已经挂了只给反射用的天空，金属件有东西可反射了，
         # 金属度可以给回高值 —— 之前压到 0.3 是因为没有反射，高金属度会渲成暗褐色。
-        b.inputs["Metallic"].default_value = 0.80 if name.startswith("board_gold") else 0.0
+        b.inputs["Metallic"].default_value = 0.25 if name.startswith("board_gold") else 0.0
     # 宝石和发光条微微发光。强度别给大，Standard 视图变换不做色调映射，
     # 给到 1.0 以上直接烧成白的，等级色就看不出来了。
     if name in EMISSIVE and "Emission Color" in b.inputs:
@@ -811,6 +820,33 @@ def subdivide_for_ao(max_edge, passes):
     print("AO_SUBDIV 面数 %d -> %d" % (before, after))
 
 
+def vertex_convexity(me):
+    """每个顶点的凸度：邻点相对顶点法线越"靠下"越凸（棱、角），返回 0..1。
+
+    conv = 平均( -normalize(邻点 - 本点) · 顶点法线 )
+    平面上邻点都在切平面内 -> 约等于 0；凸棱上邻点都在法线下方 -> 明显为正。
+    """
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    out = [0.0] * len(bm.verts)
+    for v in bm.verts:
+        if not v.link_edges:
+            continue
+        acc, n = 0.0, 0
+        for e in v.link_edges:
+            d = e.other_vert(v).co - v.co
+            if d.length < 1e-9:
+                continue
+            acc += -(d.normalized().dot(v.normal))
+            n += 1
+        if n:
+            out[v.index] = acc / n
+    bm.free()
+    return out
+
+
 def _group_of(ob):
     n = ob
     while n is not None:
@@ -866,18 +902,27 @@ def bake_ao():
     _bake_group(frame, mover, cfg["samples"])
     _bake_group(mover, frame, cfg["samples"])
 
-    # 调强度 + 兜底，避免角落烘成纯黑。强度按材质加权。
+    # 调强度 + 兜底，避免角落烘成纯黑；强度按材质加权；
+    # 再叠一层"棱高光"：平面相对棱压暗，金属件才有明暗层次。
     floor = cfg["floor"]
     per = cfg.get("per_material", {})
+    egain = cfg.get("edge_gain", {})
+    sharp = float(cfg.get("edge_sharp", 6.0))
     for ob in meshes:
-        col = ob.data.color_attributes.active_color
+        me = ob.data
+        col = me.color_attributes.active_color
         if col is None:
             continue
-        mname = ob.data.materials[0].name if ob.data.materials else ""
+        mname = me.materials[0].name if me.materials else ""
         k = cfg["strength"] * float(per.get(mname, 1.0))
-        for d in col.data:
+        g = float(egain.get(mname, 0.0))
+        conv = vertex_convexity(me) if g > 0.0 else None
+        for i, d in enumerate(col.data):
             v = 1.0 - (1.0 - d.color[0]) * k
             v = floor + (1.0 - floor) * v
+            if conv is not None:
+                t = min(max(conv[me.loops[i].vertex_index] * sharp, 0.0), 1.0)
+                v *= 1.0 - g * (1.0 - t)
             d.color = (v, v, v, 1.0)
     print("AO_BAKED %d 个网格" % len(meshes))
 

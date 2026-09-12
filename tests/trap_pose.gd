@@ -108,6 +108,10 @@ func _world(cs: float) -> void:
 		sky_mat.energy_multiplier = float(ec.get("refl_energy", 1.0))
 		var sky := Sky.new()
 		sky.sky_material = sky_mat
+		# 背景不是天空时，Godot 默认不一定会去生成天空的辐照度贴图，
+		# 强制成实时处理才拿得到反射
+		sky.process_mode = Sky.PROCESS_MODE_REALTIME
+		sky.radiance_size = Sky.RADIANCE_SIZE_128
 		e.sky = sky
 		e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.environment = e
