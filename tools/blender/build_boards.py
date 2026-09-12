@@ -100,7 +100,8 @@ PARAMS = {
         "gold_top_step":    0.004,  # 每级加高多少
         "groove_width":     0.020,  # 金框内侧那圈暗凹槽的宽度。
                                     # 它负责把金框和内板分开，去掉的话整块板会糊成一片
-        "groove_below":     0.014,  # 凹槽底面比内板低多少
+        "groove_below":     0.000,  # 凹槽顶面比内板低多少。0 = 和板面齐平，
+                                    # 这时那圈暗色靠**颜色**分层，不再靠高低差
         "goldline_width":   0.016,  # 二级起，金框外侧那道暗金细线的宽度
 
         # 四角铆钉：正方形，外沿和金框外沿齐平（也就是正好占住格子的四个角）
@@ -114,9 +115,8 @@ PARAMS = {
         "bolt_cap_ratio":   0.3333, # 钉帽半径 ÷ bolt_size。
                                     # 上限是 0.471（正方形中心到朝内斜角的距离），
                                     # 超过就会切出斜角外面去
-        "plate_top":        0.078,  # 内板上表面。**所有活动件静止时都对齐到这个高度**
-                                    # = gold_top × 2：设计图里 plate 这一层的厚度
-                                    # 大约是金框高度的两倍，板底坐在地面（z=0）上
+        "plate_top":        0.064,  # 内板上表面 = 暗凹槽的上表面（两者齐平）。
+                                    # **所有活动件静止时都对齐到这个高度**
     },
 
     # ---------------- 尖刺板 ----------------
@@ -125,6 +125,8 @@ PARAMS = {
     "spikes": {
         "base_depth":       0.300,  # 砖体往地下的厚度。刺收回去要能整根藏进去
         "plate_inset":      0.030,  # 内板外沿从 gold_inner 再往里缩多少（让开暗凹槽）
+        "plate_thick":      0.039,  # 内板这一层的厚度。板底 = plate_top - plate_thick，
+                                    # 底座顶面就顶在那里（也就是槽底），槽深 = 这个值
         "plate_rim":        0.096,  # 内板靠四边那圈的宽度。
                                     # 现在和中间十字条同宽（cross_half × 2 = 0.096），
                                     # 四个洞因此往内收，边框看着和十字一样粗
@@ -623,10 +625,11 @@ def build_spikes(root):
 
     inner = fp("gold_inner") - P["plate_inset"]
     top = fp("plate_top")
+    bottom = top - P["plate_thick"]   # 板底 = 底座顶面 = 槽底
     # 底座：顶面就是槽底，按**金框内沿**铺满，连凹槽底下也垫上。
-    # 顶面必须停在 z=0 —— 游戏里地面以下会被地板挡住，槽底要是沉到 0 以下，
-    # 从洞里看到的就是游戏地板而不是底座。
-    box("Base", (0, 0, -P["base_depth"] * 0.5),
+    # 顶面不能沉到 z=0 以下 —— 游戏里地面以下会被地板挡住，
+    # 那样从洞里看到的就是游戏地板而不是底座。
+    box("Base", (0, 0, bottom - P["base_depth"] * 0.5),
         (fp("gold_inner") * 2, fp("gold_inner") * 2, P["base_depth"]), "board_base", frame)
 
     # 内板：一整块带四个方洞的板。拿外圈 + 十字拼的话，每块都会被倒角修出一圈棱，
@@ -636,14 +639,14 @@ def build_spikes(root):
     edge = inner - rim
     xs = [-inner, -edge, -div, div, edge, inner]
     slab_with_holes("Plate", xs, xs, [(1, 1), (1, 3), (3, 1), (3, 3)],
-                    0.0, top, "board_plate", frame)
+                    bottom, top, "board_plate", frame)
 
     hole_w = edge - div              # 一个方槽的**全宽**
     d = div + hole_w * 0.5           # 槽中心距原点
 
     cap_w = hole_w * P["cap_fill"]
     tip = top - P["tip_below_plate"]
-    cap_h = tip - 0.004              # 锥底落在槽底
+    cap_h = tip - bottom             # 锥底正好落在槽底
     base_z = tip - cap_h
     for i, (sx, sy) in enumerate(((d, d), (-d, d), (d, -d), (-d, -d))):
         box("SpikeShaft%d" % i, (sx, sy, base_z - P["shaft_len"] * 0.5 + 0.004),
