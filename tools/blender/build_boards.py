@@ -58,11 +58,17 @@ ACCENT = {
 # 内板和槽底是这一版改动最大的地方：原来给成了接近黑，参考图里其实
 # 只比地砖略灰一点，槽底也只是中灰。
 COLORS = {
-    "board_stone":     (0.97, 0.96, 0.93),   # 奶白石材，和场景地面一个调子
-    "board_plate":     (0.845, 0.815, 0.781),  # 内板：比地面略灰一点
-    "board_recess":    (0.40, 0.43, 0.44),   # 槽底/凹槽：中灰，不是黑
-    "board_gold":      (0.85, 0.68, 0.28),
-    "board_gold_dark": (0.58, 0.45, 0.22),
+    # 这里写的是**贴图色**，不是最终屏幕上的颜色。游戏场景的环境光很亮，
+    # 实测屏幕值 ≈ 0.31 + 0.71 * 贴图色（两点拟合），也就是说存在一个 0.31 的
+    # 亮度地板 —— 按设计图直接填 0.23 的槽色，上屏是 0.475，完全不暗。
+    # 所以这些值是**反推**出来的：目标屏幕值代入上式求贴图色。
+    #   石材 -> 屏幕 0.95    内板 -> 屏幕 0.85（比地面略灰）
+    #   槽色 -> 尽量压到地板附近   金 -> 屏幕 0.88
+    "board_stone":     (0.92, 0.90, 0.87),
+    "board_plate":     (0.750, 0.722, 0.690),
+    "board_recess":    (0.075, 0.105, 0.130),
+    "board_gold":      (0.790, 0.600, 0.330),
+    "board_gold_dark": (0.34, 0.25, 0.14),
     "board_accent":    (1.0, 1.0, 1.0),      # 运行时按等级替换
 }
 
@@ -101,7 +107,7 @@ def mat(name):
     if name in EMISSIVE and "Emission Color" in b.inputs:
         b.inputs["Emission Color"].default_value = to_linear(c)
         if "Emission Strength" in b.inputs:
-            b.inputs["Emission Strength"].default_value = 0.30
+            b.inputs["Emission Strength"].default_value = 0.45
     return m
 
 
@@ -287,9 +293,9 @@ def ring(name, parent, outer, inner, z0, z1, material, bevel=0.008, center=(0, 0
 def bolts(name, parent, r, z, material, size=0.052):
     """角铆钉：八边形小柱 + 一层收口，参考图里四角各一颗。"""
     for i, (cx, cy) in enumerate(((r, r), (-r, r), (r, -r), (-r, -r))):
-        cyl("%s%d" % (name, i), (cx, cy, z), size, 0.055, material, parent,
+        cyl("%s%d" % (name, i), (cx, cy, z), size, 0.070, material, parent,
             sides=8, rot_z=math.radians(22.5))
-        cyl("%sT%d" % (name, i), (cx, cy, z + 0.032), size * 0.70, 0.026, material, parent,
+        cyl("%sT%d" % (name, i), (cx, cy, z + 0.040), size * 0.72, 0.030, material, parent,
             sides=8, rot_z=math.radians(22.5))
 
 
@@ -306,15 +312,21 @@ FRAME_TOP = 0.078       # 金框上表面，只比内板高一点点
 
 
 def floor_frame(frame):
-    """地面板共用的边框：外圈石缘 + 薄金框 + 四角铆钉。等级越高金框略厚。"""
+    """地面板共用的边框：外圈石缘 + 薄金框 + 一圈暗凹槽 + 四角铆钉。
+
+    那圈暗凹槽是关键：设计图里金框和内板之间有一条明显的暗线，
+    少了它整块板从白到浅灰连成一片，完全没有层次。"""
     t = _tier
     ring("Kerb", frame, R_OUT, R_STONE, 0.0, 0.050, "board_stone")
     gold_h = FRAME_TOP + 0.008 * (t - 1)
     ring("Gold", frame, R_STONE, R_GOLD, 0.0, gold_h, "board_gold")
+    # 金框内沿的暗凹槽：把金框和内板分开
+    ring("Groove", frame, R_GOLD, R_GOLD - 0.030, 0.0, PLATE_TOP - 0.014, "board_recess")
     if t >= 2:
         ring("GoldLine", frame, R_GOLD + 0.016, R_GOLD, 0.0, gold_h + 0.010, "board_gold_dark")
-    bolts("Bolt", frame, R_STONE - 0.030, gold_h - 0.020, "board_gold",
-          size=0.052 + 0.005 * (t - 1))
+    # 铆钉要够大：设计图里是四颗很显眼的八角螺栓，之前做小了一圈
+    bolts("Bolt", frame, R_STONE - 0.018, gold_h - 0.018, "board_gold",
+          size=0.074 + 0.006 * (t - 1))
 
 
 def corner_leaves(parent, a0, a1, r, length, count, axis="z", phase=math.pi * 0.25):
@@ -336,12 +348,15 @@ def build_spring(root):
 
     # 弹出侧（-Y）的结构：一条凹槽，里面一根发光条，两端各一颗铆钉。
     # 参考图里这条是弹簧板最好认的特征，说明这一侧是铰链、往对面弹。
-    ch_y = -R_GOLD + 0.058
-    box("Channel", (0, ch_y, 0.030), (0.72, 0.098, 0.060), "board_recess", frame)
-    box("ChannelLip", (0, ch_y, 0.020), (0.76, 0.125, 0.040), "board_gold_dark", frame)
-    box("Glow", (0, ch_y, 0.052), (0.60, 0.050, 0.024), "board_accent", frame)
+    # 这条结构在设计图里很粗很显眼：深槽 + 亮发光条 + 两端各一颗大螺栓。
+    # 第二版做得又薄又平，只剩一条细线，完全看不出是"弹出的那一侧"。
+    ch_y = -R_GOLD + 0.080
+    box("Channel", (0, ch_y, 0.026), (0.60, 0.150, 0.052), "board_recess", frame)
+    box("Glow", (0, ch_y, 0.048), (0.52, 0.072, 0.030), "board_accent", frame)
     for i, sx in enumerate((-1, 1)):
-        cyl("ChBolt%d" % i, (sx * 0.345, ch_y, 0.050), 0.050, 0.050, "board_gold", frame,
+        cyl("ChBolt%d" % i, (sx * 0.325, ch_y, 0.050), 0.074, 0.070, "board_gold", frame,
+            sides=8, rot_z=math.radians(22.5))
+        cyl("ChBoltT%d" % i, (sx * 0.325, ch_y, 0.090), 0.053, 0.030, "board_gold", frame,
             sides=8, rot_z=math.radians(22.5))
 
     # 板本体：铰链在凹槽外沿，静止时上表面和内板齐平
@@ -349,21 +364,20 @@ def build_spring(root):
     mover = joint("Mover", (0, hinge_y, 0.0), root)
     depth = R_GOLD - 0.012 - hinge_y
     cy = depth * 0.5
-    box("Plate", (0, cy, PLATE_TOP - 0.022), (0.74, depth, 0.044), "board_plate", mover)
-    if t >= 2:
-        # 板边一圈金线，等级越高越明显
-        ring("PlateEdge", mover, 0.372, 0.352, PLATE_TOP - 0.030, PLATE_TOP + 0.002,
-             "board_gold" if t >= 3 else "board_gold_dark", center=(0, cy))
+    box("Plate", (0, cy, PLATE_TOP - 0.022), (0.68, depth, 0.044), "board_plate", mover)
+    # 板边一圈金线：设计图里一级就有，不是二级才出现
+    ring("PlateEdge", mover, 0.340, 0.318, PLATE_TOP - 0.030, PLATE_TOP + 0.003,
+         "board_gold" if t >= 2 else "board_gold_dark", center=(0, cy))
 
     # 箭头：平嵌进板面，只比板高一点点（防 z-fighting），不做成凸起
-    prism("Arrow", place(arrow_pts(0.42, 0.125, 0.14, 0.255), (0, cy)),
-          PLATE_TOP - 0.012, PLATE_TOP + 0.004, "board_accent", mover, bevel=0.004)
-    if t >= 2:
-        # 叶片也是平嵌的
-        for i, sx in enumerate((-1, 1)):
-            leaf("Leaf%d" % i, (sx * 0.245, cy + 0.02), 0.150, 0.062,
-                 PLATE_TOP - 0.008, PLATE_TOP + 0.003, "board_gold", mover,
-                 angle=math.radians(-30 * sx))
+    # 箭头要大：设计图里几乎占满板面
+    prism("Arrow", place(arrow_pts(0.50, 0.150, 0.17, 0.310), (0, cy)),
+          PLATE_TOP - 0.012, PLATE_TOP + 0.005, "board_accent", mover, bevel=0.004)
+    # 叶片也是平嵌的。设计图里一级就有两片，等级高的再加
+    for i, sx in enumerate((-1, 1)):
+        leaf("Leaf%d" % i, (sx * 0.215, cy + 0.115 * sx), 0.150, 0.062,
+             PLATE_TOP - 0.008, PLATE_TOP + 0.003, "board_gold", mover,
+             angle=math.radians(-30 * sx))
     if t >= 3:
         for i, sx in enumerate((-1, 1)):
             leaf("Leaf%d" % (i + 2), (sx * 0.245, cy - 0.20), 0.130, 0.054,
@@ -387,25 +401,35 @@ def build_spikes(root):
     box("Base", (0, 0, -0.150), (R_GOLD * 2, R_GOLD * 2, 0.300), "board_recess", frame)
 
     # 浅灰内板做成"井"字：外圈 + 十字隔条，中间空出四个方槽
-    inner = R_GOLD - 0.006
-    div = 0.055                      # 十字隔条半宽
-    rim = 0.048                      # 外圈宽度
+    inner = R_GOLD - 0.030           # 让开外面那圈暗凹槽
+    div = 0.048                      # 十字隔条半宽
+    rim = 0.030                      # 外圈宽度
     z0, z1 = 0.0, PLATE_TOP
     cz, h = (z0 + z1) * 0.5, z1 - z0
     ring("Plate", frame, inner, inner - rim, z0, z1, "board_plate")
     box("PlateCrossX", (0, 0, cz), (inner * 2, div * 2, h), "board_plate", frame)
     box("PlateCrossY", (0, 0, cz), (div * 2, inner * 2, h), "board_plate", frame)
 
+    # 槽壁贴一圈暗色内衬：不然槽壁是浅灰的内板本身，只有槽底暗，看不出深度
+    for i, (sx, sy) in enumerate(((1, 1), (-1, 1), (1, -1), (-1, -1))):
+        hw = ((inner - rim) - div) * 0.5
+        cx = (div + hw) * sx
+        cy2 = (div + hw) * sy
+        ring("Liner%d" % i, frame, hw, hw - 0.028, 0.0, PLATE_TOP, "board_recess",
+             center=(cx, cy2))
+
     # 四根刺：刺尖静止时正好落在板面高度上 —— 不突出，但槽里看得见刺。
     # 锥体做得矮而宽，这样从槽口看过去填得满，和参考图一致；
     # 下面再接一段方柱，弹出来的时候才是一根像样的刺，而不是一片薄锥。
     hole_w = (inner - rim) - div     # 一个方槽的**全宽**
     d = div + hole_w * 0.5           # 槽中心距原点（之前误用了槽外沿，刺大了一倍）
-    cap_h = 0.090
-    cap_w = hole_w * 0.82
+    # 锥体要填满槽口（设计图里几乎顶到槽壁），高度取槽深，
+    # 这样静止时从槽口看下去正好是一整个锥，而不是一个小尖
+    cap_w = hole_w * 0.60
     tip = PLATE_TOP - 0.002          # 刺尖：刚好齐板面，确保不突出
+    cap_h = tip - 0.004              # 锥底落在槽底
     base_z = tip - cap_h
-    shaft_h = 0.20
+    shaft_h = 0.22
     # 不做托板：四根刺已经挂在 Mover 下面一起动，托板反而会露在砖体外面
     for i, (sx, sy) in enumerate(((d, d), (-d, d), (d, -d), (-d, -d))):
         box("SpikeShaft%d" % i, (sx, sy, base_z - shaft_h * 0.5 + 0.004),
@@ -448,11 +472,19 @@ def build_push(root):
                                  (-hw + fw * 0.5, cz + hh - fw * 0.5),
                                  (hw - fw * 0.5, cz - hh + fw * 0.5),
                                  (-hw + fw * 0.5, cz - hh + fw * 0.5))):
-        cyl("Bolt%d" % i, (bx, front + 0.018, bz), 0.052 + 0.006 * (t - 1), 0.050,
+        cyl("Bolt%d" % i, (bx, front + 0.022, bz), 0.072 + 0.006 * (t - 1), 0.058,
             "board_gold", frame, axis="y", sides=8, rot_z=math.radians(22.5))
 
+    # 金框内沿的暗凹槽，和地面板同理
+    for nm, bx, bz, sx, sz in (("T", 0, cz + hh - fw - 0.014, hw * 2 - fw * 2, 0.028),
+                               ("B", 0, cz - hh + fw + 0.014, hw * 2 - fw * 2, 0.028),
+                               ("L", -hw + fw + 0.014, cz, 0.028, hh * 2 - fw * 2),
+                               ("R", hw - fw - 0.014, cz, 0.028, hh * 2 - fw * 2)):
+        box("Groove" + nm, (bx, front * 0.42, bz), (sx, front * 0.84, sz),
+            "board_recess", frame)
+
     # 左右两条发光竖条，紧贴金框内沿
-    bar_x = hw - fw - 0.032
+    bar_x = hw - fw - 0.046
     for i, sx in enumerate((-1, 1)):
         box("Bar%d" % i, (sx * bar_x, front * 0.62, cz),
             (0.050, front * 0.80, hh * 2 - fw * 2 - 0.030), "board_accent", frame)
@@ -466,8 +498,8 @@ def build_push(root):
             "board_gold_dark" if t == 2 else "board_gold", mover)
 
     # 宝石：这个是允许凸出来的，参考图里就是一颗嵌在板上的宝石
-    gem("Gem", (0, front + 0.006, cz), 0.100 + 0.020 * (t - 1), 0.036 + 0.009 * (t - 1),
-        0.050, "board_accent", mover, axis="y")
+    gem("Gem", (0, front + 0.004, cz), 0.130 + 0.022 * (t - 1), 0.048 + 0.010 * (t - 1),
+        0.058, "board_accent", mover, axis="y")
     if t >= 2:
         for i, sx in enumerate((-1, 1)):
             leaf("PanelLeaf%d" % i, (sx * 0.205, cz), 0.150, 0.062,

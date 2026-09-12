@@ -16,6 +16,14 @@ func _ready() -> void:
 		_auto_place(g)
 		g.gold = Cfg.int_at("economy.start_gold", 320)
 		m.hud.toggle_stats()
+		# --build：停在建造阶段，也就是玩家放机关时看到的样子
+		if "--build" in OS.get_cmdline_user_args():
+			for t in g._trap_root.get_children():
+				print("TRAP %s cell=%s pos=%s view=%s" % [
+					t.id, str(t.cell), str(t.position),
+					"有" if t.view != null else "无（退回色块）"])
+			await _maybe_screenshot()
+			return
 		if not _spawn_override(g):
 			g.start_wave()
 		await _maybe_screenshot()
