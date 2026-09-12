@@ -437,6 +437,11 @@ Godot_v4.7-stable_win64_console.exe --headless --editor --quit --path .
 
 ## 6.8.1 机关面板（v0.0.34 起）
 
+> **改这几块面板的外观，看 [`机关面板_部件说明.md`](机关面板_部件说明.md)。**
+> 那份文档有带部件名标注的图、部件→参数对照表，以及
+> `python tools/preview_board.py <类型> <等级>` 这条十秒出图的命令。
+> 所有比例数字集中在 `build_boards.py` 顶部的 `PARAMS` 表里，几何代码只读表。
+
 照 `ref/3 boards.png` 做的三种面板，取代了地刺 / 弹射板 / 推墙原来的机械造型
 （黏胶和锯墙仍用 `build_traps.py` 的机械造型）。生成脚本
 `tools/blender/build_boards.py`，三种 × 三个等级共 9 个模型。
